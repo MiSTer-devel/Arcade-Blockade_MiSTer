@@ -1,0 +1,21 @@
+<misterromdescription>
+	<name>Blockade</name>
+
+	<setname>blockade</setname>
+	<mameversion>0225</mameversion>
+	<rbf>Blockade</rbf>
+
+	<buttons default="A,B,Start,Select" names="Fast,Pause,Start,Test"></buttons>
+	<switches></switches>
+
+	<rom index="1"></rom>
+	<rom index="0" md5="none" zip="blockade.zip">
+		<part crc="b77a50db" name="14479a.mpr"/>
+	</rom>
+	<rom index="2"></rom>
+	<rom index="3"></rom>
+	<rom index="4"></rom>
+
+	<nvram></nvram>
+
+</misterromdescription>	
