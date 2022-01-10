@@ -1,4 +1,5 @@
-export OPTIMIZE="-O3 --x-assign fast --x-initial fast --noassert"
+#export OPTIMIZE="-O3 --x-assign fast --x-initial fast --noassert"
+export OPTIMIZE="--x-assign fast --x-initial fast --noassert"
 export WARNINGS="-Wno-TIMESCALEMOD"
 
 set -e
@@ -8,6 +9,7 @@ verilator \
 --converge-limit 6000 \
 --top-module emu sim.v \
 -I../rtl \
+-I../rtl/ic \
 -I../rtl/tv80
 else
 	echo "not running on windows"

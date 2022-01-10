@@ -1,5 +1,5 @@
 #include <verilated.h>
-#include "Vtop.h"
+#include "Vemu.h"
 
 #include "imgui.h"
 #ifndef _MSC_VER
@@ -18,15 +18,36 @@
 #include "sim_clock.h"
 
 #include "../imgui/imgui_memory_editor.h"
-#include <verilated_vcd_c.h> //VCD Trace
+#include "../imgui/ImGuiFileDialog.h"
 
-// Debug GUI
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <iterator>
+#include <string>
+#include <sstream>
+#include <iomanip>
+
+using namespace std;
+
+// Simulation control
+// ------------------
+int initialReset = 48;
+bool run_enable = 1;
+int batchSize = 25000000 / 1000000;
+bool single_step = 0;
+bool multi_step = 0;
+int multi_step_amount = 1024;
+
+// Debug GUI 
 // ---------
-const char *windowTitle = "Verilator Sim: Arcade-Blockade";
-bool showDebugWindow = true;
-const char *debugWindowTitle = "Virtual Dev Board v1.0";
+const char* windowTitle = "Verilator Sim: Aznable";
+const char* windowTitle_Control = "Simulation control";
+const char* windowTitle_DebugLog = "Debug log";
+const char* windowTitle_Video = "VGA output";
+bool showDebugLog = true;
 DebugConsole console;
-MemoryEditor memoryEditor_hs;
+MemoryEditor mem_edit;
 
 // HPS emulator
 // ------------
@@ -34,7 +55,7 @@ SimBus bus(console);
 
 // Input handling
 // --------------
-SimInput input(12);
+SimInput input(12, console);
 const int input_right = 0;
 const int input_left = 1;
 const int input_down = 2;
@@ -50,54 +71,21 @@ const int input_pause = 11;
 
 // Video
 // -----
-#define VGA_WIDTH 256
-#define VGA_HEIGHT 192
-#define VGA_ROTATE 0
-#define VGA_SCALE_X 4.0
-#define VGA_SCALE_Y 3.0
+#define VGA_WIDTH 320
+#define VGA_HEIGHT 240
+#define VGA_ROTATE 0  // 90 degrees anti-clockwise
+#define VGA_SCALE_X vga_scale
+#define VGA_SCALE_Y vga_scale
 SimVideo video(VGA_WIDTH, VGA_HEIGHT, VGA_ROTATE);
-
-// Simulation control
-// ------------------
-int initialReset = 48;
-bool run_enable = 1;
-int batchSize = 25000000 / 100;
-bool single_step = 0;
-bool multi_step = 0;
-int multi_step_amount = 1024;
+float vga_scale = 3.0;
 
 // Verilog module
 // --------------
-Vtop *top = NULL;
+Vemu* top = NULL;
 vluint64_t main_time = 0; // Current simulation time.
 double sc_time_stamp()
 { // Called by $time in Verilog.
 	return main_time;
-}
-
-// VCD trace
-VerilatedVcdC *tfp = new VerilatedVcdC; // Trace
-bool Trace = 0;
-char Trace_Deep[3] = "99";
-char Trace_File[30] = "sim.vcd";
-char Trace_Deep_tmp[3] = "99";
-char Trace_File_tmp[30] = "sim.vcd";
-int iTrace_Deep_tmp = 99;
-char SaveModel_File_tmp[20] = "test", SaveModel_File[20] = "test";
-// Trace Save/Restore
-void save_model(const char *filenamep)
-{
-	VerilatedSave os;
-	os.open(filenamep);
-	os << main_time; // user code must save the timestamp, etc
-	os << *top;
-}
-void restore_model(const char *filenamep)
-{
-	VerilatedRestore os;
-	os.open(filenamep);
-	os >> main_time;
-	os >> *top;
 }
 
 int clockSpeed = 8;	 // This is not used, just a reminder for the dividers below
@@ -112,6 +100,65 @@ void resetSim()
 	clk_pix.Reset();
 }
 
+
+// CPU debug
+bool cpu_sync;
+bool cpu_sync_last;
+std::vector<std::vector<std::string> > opcodes;
+std::map<std::string, std::string> opcode_lookup;
+
+void loadOpcodes()
+{
+	std::string fileName = "8080_opcodes.csv";
+
+	std::string                           header;
+	std::ifstream                         reader(fileName);
+	if (reader.is_open()) {
+		std::string line, column, id;
+		std::getline(reader, line);
+		header = line;
+		while (std::getline(reader, line)) {
+			std::stringstream        ss(line);
+			std::vector<std::string> columns;
+			bool                     withQ = false;
+			std::string              part{ "" };
+			while (std::getline(ss, column, ',')) {
+				auto pos = column.find("\"");
+				if (pos < column.length()) {
+					withQ = !withQ;
+					part += column.substr(0, pos);
+					column = column.substr(pos + 1, column.length());
+				}
+				if (!withQ) {
+					column += part;
+					columns.emplace_back(std::move(column));
+					part = "";
+				}
+				else {
+					part += column + ",";
+				}
+			}
+			opcodes.push_back(columns);
+			opcode_lookup[columns[0]] = columns[1];
+		}
+	}
+};
+
+std::string int_to_hex(unsigned char val)
+{
+	std::stringstream ss;
+	ss << std::setfill('0') << std::setw(2) << std::hex << (val | 0);
+	return ss.str();
+}
+
+std::string get_opcode(int i)
+{
+	std::string hex = "0x";
+	hex.append(int_to_hex(i));
+	std::string code = opcode_lookup[hex];
+	return code;
+}
+
 int verilate()
 {
 
@@ -119,56 +166,69 @@ int verilate()
 	{
 
 		// Assert reset during startup
-		if (main_time < initialReset)
-		{
-			top->reset = 1;
-		}
+		if (main_time < initialReset) { top->reset = 1; }
 		// Deassert reset after startup
-		if (main_time == initialReset)
-		{
-			top->reset = 0;
-		}
+		if (main_time == initialReset) { top->reset = 0; }
 
 		// Clock dividers
 		clk_sys.Tick();
 		clk_pix.Tick();
 
 		// Set system clock in core
-		top->clk_4 = clk_sys.clk;
+		top->clk_sys = clk_sys.clk;
 
-		// Update console with current cycle for logging
-		console.prefix = "(" + std::to_string(main_time) + ") ";
-
-		// Output pixels on rising edge of pixel clock
-		if (clk_pix.clk && !clk_pix.old)
-		{
-			uint32_t colour = 0xFF000000 | top->VGA_B << 16 | top->VGA_G << 8 | top->VGA_R;
-			video.Clock(top->VGA_HB, top->VGA_VB, colour);
-		}
+		//// Update console with current cycle for logging
+		//console.prefix = "(" + std::to_string(main_time) + ") ";
 
 		// Simulate both edges of system clock
-		if (clk_sys.clk != clk_sys.old)
-		{
-			if (clk_sys.clk)
-			{
+		if (clk_sys.clk != clk_sys.old) {
+			if (clk_sys.clk) {
+				input.BeforeEval();
 				bus.BeforeEval();
 			}
 			top->eval();
-			if (Trace)
+			if (clk_sys.clk) { bus.AfterEval(); }
+
+			cpu_sync = top->emu__DOT__blockade__DOT__SYNC;
+			if (cpu_sync && !cpu_sync_last)
 			{
-				if (!tfp->isOpen())
-					tfp->open(Trace_File);
-				tfp->dump(main_time); // Trace
+				unsigned short pc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_pc;
+				unsigned short addr = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__a;
+				unsigned char data = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__d;
+				unsigned char i = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__i;
+				unsigned char acc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__acc;
+
+				std::string log = "PC=%04X ADDR=%04x D=%02x ACC=%02X I=%02x ";
+				log.append(get_opcode(i));
+				console.AddLog(log.c_str(), pc,
+					addr,
+					data, 
+					acc,
+					i);
+
 			}
 
-			if (clk_sys.clk)
-			{
-				bus.AfterEval();
-			}
+			cpu_sync_last = cpu_sync;
+
+
+		}
+
+#ifdef DEBUG_AUDIO
+		clk_audio.Tick();
+		if (clk_audio.IsRising()) {
+			// Output audio
+			unsigned short audio_l = top->AUDIO_L;
+			audioFile.write((const char*)&audio_l, 2);
+		}
+#endif
+
+		// Output pixels on rising edge of pixel clock
+		if (clk_sys.IsRising() && top->emu__DOT__ce_pix) {
+			uint32_t colour = 0xFF000000 | top->VGA_B << 16 | top->VGA_G << 8 | top->VGA_R;
+			video.Clock(top->VGA_HB, top->VGA_VB, top->VGA_HS, top->VGA_VS, colour);
 		}
 
 		main_time++;
-
 		return 1;
 	}
 	// Stop verilating and cleanup
@@ -178,23 +238,20 @@ int verilate()
 	return 0;
 }
 
-int main(int argc, char **argv, char **env)
+int main(int argc, char** argv, char** env)
 {
-
 	// Create core and initialise
-	top = new Vtop();
+	top = new Vemu();
 	Verilated::commandArgs(argc, argv);
-
-	// Prepare for Dump Signals
-	Verilated::traceEverOn(true); // Trace
-	top->trace(tfp, 1);			  // atoi(Trace_Deep) );  // Trace 99 levels of hierarchy
-	if (Trace)
-		tfp->open(Trace_File); //"simx.vcd"); //Trace
 
 #ifdef WIN32
 	// Attach debug console to the verilated code
 	Verilated::setDebug(console);
 #endif
+
+	// Load debug opcodes
+	loadOpcodes();
+
 
 	// Attach bus
 	bus.ioctl_addr = &top->ioctl_addr;
@@ -273,94 +330,68 @@ int main(int argc, char **argv, char **env)
 		// --------
 		ImGui::NewFrame();
 
-		console.Draw("Debug Log", &showDebugWindow);
-		ImGui::Begin(debugWindowTitle);
-
-		if (ImGui::Button("RESET"))
-		{
-			resetSim();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("START"))
-		{
-			run_enable = 1;
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("STOP"))
-		{
-			run_enable = 0;
-		}
-		ImGui::SameLine();
+		// Simulation control window
+		ImGui::Begin(windowTitle_Control);
+		ImGui::SetWindowPos(windowTitle_Control, ImVec2(0, 0), ImGuiCond_Once);
+		ImGui::SetWindowSize(windowTitle_Control, ImVec2(500, 150), ImGuiCond_Once);
+		if (ImGui::Button("Reset simulation")) { resetSim(); } ImGui::SameLine();
+		if (ImGui::Button("Start running")) { run_enable = 1; } ImGui::SameLine();
+		if (ImGui::Button("Stop running")) { run_enable = 0; } ImGui::SameLine();
 		ImGui::Checkbox("RUN", &run_enable);
-
-		ImGui::Checkbox("Export VCD", &Trace);
+		//ImGui::PopItemWidth();
+		ImGui::SliderInt("Run batch size", &batchSize, 1, 250000);
+		if (single_step == 1) { single_step = 0; }
+		if (ImGui::Button("Single Step")) { run_enable = 0; single_step = 1; }
 		ImGui::SameLine();
+		if (multi_step == 1) { multi_step = 0; }
+		if (ImGui::Button("Multi Step")) { run_enable = 0; multi_step = 1; }
+		//ImGui::SameLine();
+		ImGui::SliderInt("Multi step amount", &multi_step_amount, 8, 1024);
 
-		if (ImGui::Button("FLUSH"))
-		{
-			tfp->flush();
-		}
-		ImGui::SameLine();
-		ImGui::PushItemWidth(120);
-		// if (ImGui::Inputint("Deep Level", iTrace_Deep_tmp, IM_ARRAYSIZE(Trace_Deep), ImGuiInputTextFlags_EnterReturnsTrue))
-		if (ImGui::InputInt("Deep Level", &iTrace_Deep_tmp, 1, 100, ImGuiInputTextFlags_EnterReturnsTrue))
-		{
-			// strcpy(Trace_Deep, Trace_Deep_tmp); //TODO onChange, change Trace deep
-			top->trace(tfp, iTrace_Deep_tmp);
-			// top->trace(tfp, atoi(Trace_Deep));
-			// tfp->close();
-			// tfp->open(Trace_File);
-		}
-		ImGui::SameLine();
+		ImGui::End();
 
-		if (ImGui::InputText("TraceFilename", Trace_File_tmp, IM_ARRAYSIZE(Trace_File), ImGuiInputTextFlags_EnterReturnsTrue))
-		{
-			strcpy(Trace_File, Trace_File_tmp); // TODO onChange Close and open new trace file
-			tfp->close();
-			if (Trace)
-				tfp->open(Trace_File);
-		}; // ImGui::SameLine();
+		// Debug log window
+		console.Draw(windowTitle_DebugLog, &showDebugLog, ImVec2(500, 700));
+		ImGui::SetWindowPos(windowTitle_DebugLog, ImVec2(0, 160), ImGuiCond_Once);
+		// Video window
+		ImGui::Begin(windowTitle_Video);
+		ImGui::SetWindowPos(windowTitle_Video, ImVec2(550, 0), ImGuiCond_Once);
+		ImGui::SetWindowSize(windowTitle_Video, ImVec2((VGA_WIDTH * VGA_SCALE_X) + 24, (VGA_HEIGHT * VGA_SCALE_Y) + 114), ImGuiCond_Once);
 
-		ImGui::PopItemWidth();
-
-		ImGui::SliderInt("Batch size", &batchSize, 1, 250000);
-
-		if (single_step == 1)
-		{
-			single_step = 0;
-		}
-		if (ImGui::Button("Single Step"))
-		{
-			run_enable = 0;
-			single_step = 1;
-		}
-		ImGui::SameLine();
-		if (multi_step == 1)
-		{
-			multi_step = 0;
-		}
-		if (ImGui::Button("Multi Step"))
-		{
-			run_enable = 0;
-			multi_step = 1;
-		}
-		ImGui::SameLine();
-		ImGui::SliderInt("Step amount", &multi_step_amount, 8, 1024);
-
-		ImGui::SliderInt("Rotate", &video.output_rotate, -1, 1);
-		ImGui::SameLine();
+		ImGui::SliderFloat("Zoom", &vga_scale, 1, 8);
+		ImGui::SliderInt("Rotate", &video.output_rotate, -1, 1); ImGui::SameLine();
 		ImGui::Checkbox("Flip V", &video.output_vflip);
-
 		ImGui::Text("main_time: %d frame_count: %d sim FPS: %f", main_time, video.count_frame, video.stats_fps);
-		ImGui::Text("pixel: %d line: %d", video.count_pixel, video.count_line);
+		//ImGui::Text("pixel: %06d line: %03d", video.count_pixel, video.count_line);
+
+		//float vol_l = ((signed short)(top->AUDIO_L) / 256.0f) / 256.0f;
+		//float vol_r = ((signed short)(top->AUDIO_R) / 256.0f) / 256.0f;
+		//ImGui::ProgressBar(vol_l + 0.5, ImVec2(200, 16), 0); ImGui::SameLine();
+		//ImGui::ProgressBar(vol_r + 0.5, ImVec2(200, 16), 0);
 
 		// Draw VGA output
 		ImGui::Image(video.texture_id, ImVec2(video.output_width * VGA_SCALE_X, video.output_height * VGA_SCALE_Y));
 		ImGui::End();
 
-		// ImGui::Begin("RAM");
-		// memoryEditor_hs.DrawContents(&top->top__DOT__blockade__DOT__MEM_RAM__DOT__ram, 2048, 0);
-		// ImGui::End();
+
+		//ImGui::Begin("rom_lsb");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 1024, 0);
+		//ImGui::End();
+		//ImGui::Begin("rom_msb");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 1024, 0);
+		//ImGui::End();
+		ImGui::Begin("ram");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__ram__DOT__mem, 1024, 0);
+		ImGui::End();
+		ImGui::Begin("sram");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__sram__DOT__mem, 256, 0);
+		ImGui::End();
+		//ImGui::Begin("prom_lsb");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 256, 0);
+		//ImGui::End();
+		//ImGui::Begin("prom_msb");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 256, 0);
+		//ImGui::End();
 
 		// ImGui::Begin("ROM");
 		// memoryEditor_hs.DrawContents(&top->top__DOT__blockade__DOT__MEM_ROM__DOT__ram, 4096, 0);
