@@ -71,21 +71,54 @@ wire u8_2 = ~(u17_q[9] && u8_1);
 // U45 AND
 wire u45 = u18_1 && SYNC;
 
+// U21_2
+// wire u56_reset = (u58_count == 9'd261);
+// always @(posedge clk) begin
+
+// end
+// reg u56_2_n = 
+// reg READY = ~(a12_n_a15 && u56_2_n);
+
 // U9 D flip-flop
-reg READY;
 reg u9_q;
 always @(posedge clk) begin
-	//if(u8_1) u9_q <= READY;
-	u9_q <= 1'b1;
+	if(reset) 
+	begin
+		u9_q <= 1'b0;
+	end
+	else
+	begin
+		if(!VBLANK_N && VBLANK_N_last)
+		begin
+			u9_q <= 1'b1;
+			$display("READY LATCH");
+		end 
+		
+		if(VBLANK_N && !VBLANK_N_last)
+		begin
+			u9_q <= 1'b0;
+			$display("READY UNLATCH");
+		end 
+	end
 end
 
 // Address decode
-wire rom_cs = ADDR[11] == 1'b0;
-wire ram_cs = ADDR[11] == 1'b1;
-wire sram_cs = ~ADDR[12];
+wire rom_cs = (!ADDR[15] && !ADDR[11] && !ADDR[10]);
+wire ram_cs = ADDR[15] && !ADDR[12];
+wire sram_cs = ADDR[15] && ADDR[12];
+
+//wire ram_we = ram_cs && !ram_WR_n;
+wire ram_we = ram_cs && !WR_N;
+wire sram_we = sram_cs && !WR_N;
+
+wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? 8'hFF : // IN0
+							(ADDR[1:0] == 2'd1) ? 8'hFF : // IN1
+							(ADDR[1:0] == 2'd2) ? 8'hFF : // IN2
+							8'h00;
 
 // CPU
-wire [7:0] cpu_data_in = rom_cs ? rom_data_out :
+wire [7:0] cpu_data_in = INP ? inp_data_out : 
+						 rom_cs ? rom_data_out :
 						 ram_cs ? ram_data_out : 
 						 sram_cs ? sram_data_out : 
 						 8'h00;
@@ -99,7 +132,7 @@ wire [7:0] DATA;
 wire DBIN;
 wire WR_N;
 wire SYNC /*verilator public_flat*/;
-wire MEMR_N;
+wire HLD_A;
 vm80a cpu
 (
 	.pin_clk(clk),
@@ -184,10 +217,12 @@ wire s_64V = u58_count[6];
 wire s_128V = u58_count[7];
 wire s_256V = u58_count[8];
 
+reg VBLANK_N_last;
 wire VBLANK_N = u58_count < 9'd224;
 
 always @(posedge clk)
 begin
+	VBLANK_N_last <= VBLANK_N;
 	// U58 1
 	HSYNC_N_last <= HSYNC_N;
 	if(HSYNC_N && !HSYNC_N_last)
@@ -209,15 +244,16 @@ end
 // U51 latch
 reg l_D7;
 reg l_D6;
-reg l_D3;
 reg l_D4;
+reg l_D3;
 always @(posedge clk) begin
 	if(u45)
 	begin
-		l_D7 <= cpu_data_out[7];
-		l_D6 <= cpu_data_out[6];
-		l_D3 <= cpu_data_out[3];
-		l_D4 <= cpu_data_out[4];
+		//$display("Latching data to U51: D=%b D7=%b D6=%b D4=%b D3=%b", DATA, l_D7, l_D6, l_D4, l_D3);
+		l_D7 <= DATA[7];
+		l_D6 <= DATA[6];
+		l_D4 <= DATA[4];
+		l_D3 <= DATA[3];
 	end
 end
 
@@ -226,13 +262,13 @@ reg OUTP = l_D4 && ~WR_N;
 // U44_1
 reg MEMW = (l_D3 && ~WR_N);
 // U45_2
-reg INP = l_D6 && DBIN;
+reg INP = (l_D6 && DBIN);
 // U44_2
 reg MEMR = (l_D7 && DBIN);
 
 // U21
-wire a12_a15 = ADDR[15] && ADDR[12];
-reg ram_WR_n = ~(MEMW && a12_a15);
+wire a12_n_a15 = ADDR[15] && ~ADDR[12];
+reg ram_WR_n = ~(MEMW && a12_n_a15);
 
 assign hsync = ~HSYNC_N;
 assign hblank = ~HBLANK_N;
@@ -244,26 +280,19 @@ assign g = prom_data_out[{ s_4H, s_2H, s_1H }];
 always @(posedge clk) begin
 	if(!reset)
 	begin
-		if(!WR_N)
+		if(!rom_cs)
 		begin
-		 	$display("CPU WRITE -> ADDR=%x  DATA=%x  ram_cs=%b  sram_cs=%b", ADDR, DATA, ram_cs, sram_cs);
+			$display("ADDR=%x DATA=%b rom=%b ram=%b sram=%b MEMW=%b WR_N=%b DBIN=%b RAMA=%x VBL=%b", ADDR, DATA, rom_cs, ram_cs, sram_cs, MEMW, WR_N, DBIN, ram_addr, vblank);
 		end
-		// if(DBIN)
+		// if(!WR_N)
 		// begin
-		// 	$display("CPU READ -> ADDR=%x  DATA=%x", ADDR, cpu_data_in);
+		// 	$display("CPUWR > ADDR=%x DATA=%x a12_n_a15=%b ram_WR_n=%b MEMW=%b ram_cs=%b", ADDR, DATA, a12_n_a15, ram_WR_n, MEMW, ram_cs);
+		// 	$display("ADDR=%x DATA=%x rom=%b ram=%b sram=%b", ADDR, cpu_data_in, rom_cs, ram_cs, sram_cs);
 		// end
-	//	$display("PHI1=%b PHI2=%b SYNC=%b ADDR=%x  READY=%b DATA=%x", PHI_1, PHI_2, SYNC, ADDR, u9_q, DATA);
-	//	$display("DBIN=%b WR_N=%b  DATA_IN=%x  DATA_OUT=%x", DBIN, WR_N, cpu_data_in, cpu_data_out);
+		//  if(DBIN)
+		//  begin
 
-		if(ce_pix)
-		begin
-			// $display("8H=%b 16H=%b 32H=%b 64H=%b 128H=%b 256H=%b pdo=%x", s_8H, s_16H, s_32H, s_64H, s_128H, s_256H, prom_data_out);
-			// $display("1V=%b 2V=%b 4V=%b 8V=%b 16V=%b 32V=%b 64V=%x 128V=%x 256V=%x", s_1V, s_2V, s_4V, s_8V, s_16V, s_32V, s_64V, s_128V, s_256V);
-			// if(vblank) $display("VBLANK");
-			// if(vsync) $display("VSYNC");
-
-		//$display("ram_data_out: %x prom_addr: %x prom_data_out: %x" , ram_data_out, prom_addr, prom_data_out);
-		end
+		//  end
 	end
 end
 
@@ -274,7 +303,7 @@ ttl_7442 u1
 	.a(ADDR[10]),
 	.b(ADDR[11]),
 	.c(ADDR[15]),
-	.d(MEMR_N),
+	.d(~MEMR),
 	.o(u1_q)
 );
 wire CS0_N = u1_q[0];
@@ -319,8 +348,8 @@ dpram #(10,4, "316-0004.u2.hex") rom_msb
 // RAM
 wire [7:0]	ram_data_out;
 wire [7:0]	ram_data_in = cpu_data_out;
-wire [9:0]  ram_addr = VBLANK_N ? { s_128V, s_64V, s_32V, s_16V, s_8V, s_128H, s_64H, s_32H, s_16H, s_8H  } : ADDR[9:0];
-wire 		ram_we = !ram_WR_n;
+wire [9:0]  vram_read_addr = { s_128V, s_64V, s_32V, s_16V, s_8V, s_128H, s_64H, s_32H, s_16H, s_8H };
+wire [9:0]  ram_addr = vblank ? ADDR[9:0] : vram_read_addr;
 
 dpram #(10,8) ram
 (
@@ -341,8 +370,6 @@ dpram #(10,8) ram
 wire [7:0]	sram_data_out;
 wire [7:0]	sram_data_in = cpu_data_out;
 wire [7:0]  sram_addr = ADDR[7:0];
-wire 		sram_we = sram_cs && !WR_N;
-
 dpram #(8,8) sram
 (
 	.clock_a(clk),

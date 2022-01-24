@@ -100,12 +100,56 @@ void resetSim()
 	clk_pix.Reset();
 }
 
+const char* debugLogFile = "C:\\repos\\Arcade-MissileCommand_MiSTer\\verilator\\dump\\cpu.log";
+// MAME debug log
+std::vector<std::string> log_mame;
+std::vector<std::string> log_cpu;
+long log_index;
 
 // CPU debug
 bool cpu_sync;
 bool cpu_sync_last;
 std::vector<std::vector<std::string> > opcodes;
 std::map<std::string, std::string> opcode_lookup;
+
+bool stop_on_log_mismatch = true;
+
+bool writeLog(const char* line)
+{
+	// Write to cpu log
+	log_cpu.push_back(line);
+
+	// Compare with MAME log
+	bool match = true;
+
+	std::string c_line = std::string(line);
+	std::string c = "CPU > " + c_line;
+	if (log_index < log_mame.size()) {
+		std::string m_line = log_mame.at(log_index);
+		std::string m = "MAME > " + m_line;
+		//std::string f = fmt::format("{0}: hcnt={1} vcnt={2} {3} {4}", log_index, top->top__DOT__missile__DOT__sc__DOT__hcnt, top->top__DOT__missile__DOT__sc__DOT__vcnt, m, c);
+		//console.AddLog(f.c_str());
+		console.AddLog(c.c_str());
+
+		if (stop_on_log_mismatch && m_line != c_line) {
+			console.AddLog("DIFF at %d", log_index);
+			console.AddLog(m.c_str());
+			console.AddLog(c.c_str());
+			match = false;
+			run_enable = 0;
+		}
+	}
+	//if (log_breakpoint > 0 && log_index == log_breakpoint) {
+	//	console.AddLog("BREAK at %d", log_index);
+	//	console.AddLog(m.c_str());
+	//	console.AddLog(c.c_str());
+	//	match = false;
+	//}
+
+	log_index++;
+	return match;
+
+}
 
 void loadOpcodes()
 {
@@ -159,6 +203,29 @@ std::string get_opcode(int i)
 	return code;
 }
 
+bool hasEnding(std::string const& fullString, std::string const& ending) {
+	if (fullString.length() >= ending.length()) {
+		return (0 == fullString.compare(fullString.length() - ending.length(), ending.length(), ending));
+	}
+	else {
+		return false;
+	}
+}
+
+std::string last_log;
+
+unsigned short active_pc;
+unsigned short last_pc;
+
+bool new_ins_last;
+
+const int ins_size = 48;
+int ins_index = 0;
+int ins_pc[ins_size];
+int ins_in[ins_size];
+int ins_ma[ins_size];
+unsigned char active_ins = 0;
+
 int verilate()
 {
 
@@ -189,27 +256,94 @@ int verilate()
 			top->eval();
 			if (clk_sys.clk) { bus.AfterEval(); }
 
-			cpu_sync = top->emu__DOT__blockade__DOT__SYNC;
-			if (cpu_sync && !cpu_sync_last)
-			{
+			if (!top->reset) {
+				cpu_sync = top->emu__DOT__blockade__DOT__SYNC;
+
 				unsigned short pc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_pc;
-				unsigned short addr = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__a;
-				unsigned char data = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__d;
+				unsigned char di = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__di;
+				unsigned short ad = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__a;
 				unsigned char i = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__i;
-				unsigned char acc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__acc;
 
-				std::string log = "PC=%04X ADDR=%04x D=%02x ACC=%02X I=%02x ";
-				log.append(get_opcode(i));
-				console.AddLog(log.c_str(), pc,
-					addr,
-					data, 
-					acc,
-					i);
+				bool pin_f1 = top->emu__DOT__blockade__DOT__cpu__DOT__f1_core;
+				bool pin_f2 = top->emu__DOT__blockade__DOT__cpu__DOT__f2_core;
+				bool pin_m1 = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__m1;
+				bool pin_t3 = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__t3;
 
+				if (pc != last_pc) {
+					//console.AddLog("%08d PC> PC=%04x I=%02x AD=%04x DI=%02x  PC0=%04x sync=%x f1=%x f2=%x", main_time, pc, i, ad, di, ins_pc[0], cpu_sync, pin_f1, pin_f2);
+				}
+				last_pc = pc;
+
+				bool new_ins = !pin_f2 && pin_f1 && (pin_m1 && pin_t3);
+				if (new_ins && !new_ins_last) {
+
+					if (active_ins != 0)
+					{
+						unsigned char skip = 1;
+						if (ins_in[skip] == active_ins) {
+							skip++;
+						}
+						unsigned char data1 = ins_in[skip];
+						unsigned char data2 = ins_in[skip + 1];
+
+						if (active_ins == 194) {
+							for (int i = 0; i < ins_index; i++) {
+								console.AddLog("%d - %02x", i, ins_in[i]);
+							}
+						}
+
+						std::string fmt = "%04X: ";
+						std::string opcode = get_opcode(active_ins);
+						if (hasEnding(opcode, "d16") || hasEnding(opcode, "adr")) {
+							opcode.resize(opcode.length() - 3);
+							char buf[6];
+							sprintf(buf, "$%02x%02x", data2, data1);
+							opcode.append(buf);
+						}
+						if (hasEnding(opcode, "d8")) {
+							opcode.resize(opcode.length() - 2);
+							char buf[6];
+							sprintf(buf, "$%02x", data1);
+							opcode.append(buf);
+						}
+						fmt.append(opcode);
+
+						unsigned short acc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__acc;
+
+//						fmt.append("\t\tacc=%02x");
+						char buf[1024];
+						sprintf(buf, fmt.c_str(), active_pc);
+						writeLog(buf);
+						//console.AddLog(fmt.c_str(), active_pc, acc);
+
+						//console.AddLog("acc=%02x", acc);
+
+						// Clear instruction cache
+						ins_index = 0;
+						for (int i = 0; i < ins_size; i++) {
+							ins_in[i] = 0;
+							ins_ma[i] = 0;
+						}
+					}
+
+					active_ins = i;
+					active_pc = ad;
+					//console.AddLog("%08d NEW> PC=%04x I=%02x AD=%04x DI=%02x  PC0=%04x sync=%x f1=%x f2=%x", main_time, pc, i, ad, di, ins_pc[0], cpu_sync, pin_f1, pin_f2);
+				}
+				new_ins_last = new_ins;
+
+				if (cpu_sync && !cpu_sync_last) {
+					//console.AddLog("%08d SC> PC=%04x I=%02x AD=%04x DI=%02x   PC0=%04x", main_time, pc, i, ad, di, ins_pc[0]);
+					ins_pc[ins_index] = pc;
+					ins_in[ins_index] = di;
+					ins_ma[ins_index] = ad;
+					ins_index++;
+					if (ins_index > ins_size - 1) { ins_index = 0; }
+				}
+
+
+				cpu_sync_last = cpu_sync;
 			}
-
-			cpu_sync_last = cpu_sync;
-
 
 		}
 
@@ -252,6 +386,12 @@ int main(int argc, char** argv, char** env)
 	// Load debug opcodes
 	loadOpcodes();
 
+	// Load debug trace
+	std::string line;
+	std::ifstream fin("blockade.tr");
+	while (getline(fin, line)) {
+		log_mame.push_back(line);
+	}
 
 	// Attach bus
 	bus.ioctl_addr = &top->ioctl_addr;
