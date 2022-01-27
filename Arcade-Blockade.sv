@@ -28,7 +28,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [45:0] HPS_BUS,
+	inout  [47:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -208,23 +208,21 @@ localparam CONF_STR = {
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",  
 	"-;",
 	"R0,Reset;",
-	"J1,Fire 1,Fire 2,Start,Coin;",
-	"Jn,A,B,Start,Select;",
+	"J1,Coin;",
+	"Jn,Start;",
 	"V,v",`BUILD_DATE
 };
 
 
 ////////////////////   CLOCKS   ///////////////////
 
-wire clk_vid;
-reg ce_sys;
-reg ce_pix;
+wire clk_sys;
 
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_vid)
+	.outclk_0(clk_sys)
 );
 
 ////////////////////   HPS   /////////////////////
@@ -251,7 +249,7 @@ wire [21:0] gamma_bus;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
-	.clk_sys(ce_sys),
+	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
 	.EXT_BUS(),
 
@@ -281,35 +279,25 @@ wire m_up     = joy[3];
 wire m_down   = joy[2];
 wire m_left   = joy[1];
 wire m_right  = joy[0];
-wire m_fire   = joy[4];
-wire m_bomb   = joy[5];
-wire m_start  = joy[6];
-wire m_coin   = joy[7];
+wire m_coin  = joy[4];
 
-///////////////////   CLOCK DIVIDER   ////////////////////
+///////////////////   INPUTS   ////////////////////
+wire [7:0] IN0 = 8'hFF;
+wire [7:0] IN1 = 8'hFF;
+wire [7:0] IN2 = 8'hFF;
 
-always @(posedge clk_vid) 
-begin
-	reg [1:0] div_px;
-	reg [2:0] div_sys;
-	
-	div_px <= div_px + (forced_scandoubler ? 2'd1 : 2'd2);
-	ce_pix <= !div_px;
-	
-	div_sys <= div_sys + 1'b1;
-	if(div_sys==1'b0) ce_sys <= !ce_sys;
-end
 
 ///////////////////   VIDEO   ////////////////////
 wire hblank, vblank;
 wire hs, vs;
+reg ce_pix;
 
 wire r, g, b;
 wire [23:0] rgb = {{8{r}},{8{g}},{8{b}}};
-arcade_video #(224,24) arcade_video
+arcade_video #(256,24) arcade_video
 (
 	.*,
-	.clk_video(clk_vid),
+	.clk_video(clk_sys),
 	.RGB_in(rgb),
 	.HBlank(hblank),
 	.VBlank(vblank),
@@ -324,17 +312,19 @@ wire reset = (RESET | status[0] | buttons[1] | rom_download);
 assign LED_USER = rom_download;
 
 blockade blockade (
-	.CLK_4M(ce_sys),
-	.RED(r),
-	.GREEN(g),
-	.BLUE(b),
-	.SYNC(),
-	.nRESET(~reset),
-	.BUTTONS(~{m_coin, m_start, m_bomb, m_fire, m_right, m_left, m_down, m_up}),
-	.H_SYNC(hs),
-	.V_SYNC(vs),
-	.H_BLANK(hblank),
-	.V_BLANK(vblank),
+	.clk(clk_sys),
+	.reset(reset),
+	.r(r),
+	.g(g),
+	.b(b),
+	.ce_pix(ce_pix),
+	.in0(IN0),
+	.in1(IN1),
+	.in2(IN2),
+	.hsync(hs),
+	.vsync(vs),
+	.hblank(hblank),
+	.vblank(vblank),
 	.dn_addr(ioctl_addr[13:0]),
 	.dn_data(ioctl_dout),
 	.dn_wr(ioctl_wr & rom_download)

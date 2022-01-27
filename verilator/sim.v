@@ -7,6 +7,10 @@ module emu(
    input reset/*verilator public_flat*/,
    input [11:0]  inputs/*verilator public_flat*/,
 
+   input [7:0] IN0,
+   input [7:0] IN1,
+   input [7:0] IN2,
+
    output [7:0] VGA_R/*verilator public_flat*/,
    output [7:0] VGA_G/*verilator public_flat*/,
    output [7:0] VGA_B/*verilator public_flat*/,
@@ -54,7 +58,10 @@ module emu(
       .r(RED),
       .g(GREEN),
       .b(BLUE),
-      .buttons(~{btn_coin, btn_start, m_bomb, m_fire, m_right, m_left, m_down, m_up}),
+      //.buttons(~{btn_coin, btn_start, m_bomb, m_fire, m_right, m_left, m_down, m_up}),
+      .in0(IN0),
+      .in1(IN1),
+      .in2(IN2),
       .hsync(VGA_HS),
       .vsync(VGA_VS),
       .hblank(VGA_HB),

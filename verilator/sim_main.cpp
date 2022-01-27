@@ -34,7 +34,7 @@ using namespace std;
 // ------------------
 int initialReset = 48;
 bool run_enable = 1;
-int batchSize = 25000000 / 1000000;
+int batchSize = 25000000 / 100000;
 bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
@@ -71,8 +71,8 @@ const int input_pause = 11;
 
 // Video
 // -----
-#define VGA_WIDTH 320
-#define VGA_HEIGHT 240
+#define VGA_WIDTH 256
+#define VGA_HEIGHT 225
 #define VGA_ROTATE 0  // 90 degrees anti-clockwise
 #define VGA_SCALE_X vga_scale
 #define VGA_SCALE_Y vga_scale
@@ -90,21 +90,25 @@ double sc_time_stamp()
 
 int clockSpeed = 8;	 // This is not used, just a reminder for the dividers below
 SimClock clk_sys(1); // 4mhz
-SimClock clk_pix(0); // 4mhz
 
 void resetSim()
 {
 	main_time = 0;
 	top->reset = 1;
 	clk_sys.Reset();
-	clk_pix.Reset();
 }
 
-const char* debugLogFile = "C:\\repos\\Arcade-MissileCommand_MiSTer\\verilator\\dump\\cpu.log";
 // MAME debug log
+
+bool log_instructions = true;
+bool stop_on_log_mismatch = true;
+bool break_vbl = 1;
+
 std::vector<std::string> log_mame;
 std::vector<std::string> log_cpu;
 long log_index;
+unsigned int ins_count = 0;
+
 
 // CPU debug
 bool cpu_sync;
@@ -112,7 +116,6 @@ bool cpu_sync_last;
 std::vector<std::vector<std::string> > opcodes;
 std::map<std::string, std::string> opcode_lookup;
 
-bool stop_on_log_mismatch = true;
 
 bool writeLog(const char* line)
 {
@@ -121,30 +124,31 @@ bool writeLog(const char* line)
 
 	// Compare with MAME log
 	bool match = true;
+	ins_count++;
 
 	std::string c_line = std::string(line);
-	std::string c = "CPU > " + c_line;
+
+	std::string c = "%d > " + c_line;
+
 	if (log_index < log_mame.size()) {
 		std::string m_line = log_mame.at(log_index);
-		std::string m = "MAME > " + m_line;
 		//std::string f = fmt::format("{0}: hcnt={1} vcnt={2} {3} {4}", log_index, top->top__DOT__missile__DOT__sc__DOT__hcnt, top->top__DOT__missile__DOT__sc__DOT__vcnt, m, c);
 		//console.AddLog(f.c_str());
-		console.AddLog(c.c_str());
+		if (log_instructions) { console.AddLog(c.c_str(), ins_count); }
 
 		if (stop_on_log_mismatch && m_line != c_line) {
 			console.AddLog("DIFF at %d", log_index);
+			std::string m = "MAME > " + m_line;
 			console.AddLog(m.c_str());
-			console.AddLog(c.c_str());
+			console.AddLog(c.c_str(), ins_count);
 			match = false;
 			run_enable = 0;
 		}
 	}
-	//if (log_breakpoint > 0 && log_index == log_breakpoint) {
-	//	console.AddLog("BREAK at %d", log_index);
-	//	console.AddLog(m.c_str());
-	//	console.AddLog(c.c_str());
-	//	match = false;
-	//}
+	else {
+		console.AddLog("MAME OUT");
+		run_enable = 0;
+	}
 
 	log_index++;
 	return match;
@@ -226,6 +230,8 @@ int ins_in[ins_size];
 int ins_ma[ins_size];
 unsigned char active_ins = 0;
 
+bool vbl_last;
+
 int verilate()
 {
 
@@ -239,7 +245,6 @@ int verilate()
 
 		// Clock dividers
 		clk_sys.Tick();
-		clk_pix.Tick();
 
 		// Set system clock in core
 		top->clk_sys = clk_sys.clk;
@@ -256,8 +261,22 @@ int verilate()
 			top->eval();
 			if (clk_sys.clk) { bus.AfterEval(); }
 
-			if (!top->reset) {
+			if (!top->reset ) {
 				cpu_sync = top->emu__DOT__blockade__DOT__SYNC;
+
+				//bool vbl = top->VGA_VB;
+				//if (vbl && !vbl_last)
+				//{
+				//	if (break_vbl) {
+				//		run_enable = 0;
+				//	}
+				//	console.AddLog("VBL");
+				//	console.AddLog("A=%02x", top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__acc);
+				//	console.AddLog("BC=%04x", top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_bc);
+				//	console.AddLog("DE=%04x", top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_de);
+				//	console.AddLog("HL=%04x", top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_hl);
+				//}
+				//vbl_last = vbl;
 
 				unsigned short pc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_pc;
 				unsigned char di = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__di;
@@ -279,18 +298,9 @@ int verilate()
 
 					if (active_ins != 0)
 					{
-						unsigned char skip = 1;
-						if (ins_in[skip] == active_ins) {
-							skip++;
-						}
+						unsigned char skip = (ins_count == 0) ? 2 : 1;
 						unsigned char data1 = ins_in[skip];
 						unsigned char data2 = ins_in[skip + 1];
-
-						if (active_ins == 194) {
-							for (int i = 0; i < ins_index; i++) {
-								console.AddLog("%d - %02x", i, ins_in[i]);
-							}
-						}
 
 						std::string fmt = "%04X: ";
 						std::string opcode = get_opcode(active_ins);
@@ -309,15 +319,9 @@ int verilate()
 						fmt.append(opcode);
 
 						unsigned short acc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__acc;
-
-//						fmt.append("\t\tacc=%02x");
 						char buf[1024];
 						sprintf(buf, fmt.c_str(), active_pc);
 						writeLog(buf);
-						//console.AddLog(fmt.c_str(), active_pc, acc);
-
-						//console.AddLog("acc=%02x", acc);
-
 						// Clear instruction cache
 						ins_index = 0;
 						for (int i = 0; i < ins_size; i++) {
@@ -325,10 +329,8 @@ int verilate()
 							ins_ma[i] = 0;
 						}
 					}
-
 					active_ins = i;
 					active_pc = ad;
-					//console.AddLog("%08d NEW> PC=%04x I=%02x AD=%04x DI=%02x  PC0=%04x sync=%x f1=%x f2=%x", main_time, pc, i, ad, di, ins_pc[0], cpu_sync, pin_f1, pin_f2);
 				}
 				new_ins_last = new_ins;
 
@@ -488,6 +490,12 @@ int main(int argc, char** argv, char** env)
 		//ImGui::SameLine();
 		ImGui::SliderInt("Multi step amount", &multi_step_amount, 8, 1024);
 
+		ImGui::NewLine();
+
+		ImGui::Checkbox("Log CPU instructions", &log_instructions);
+		ImGui::Checkbox("Stop on MAME diff", &stop_on_log_mismatch);
+		
+
 		ImGui::End();
 
 		// Debug log window
@@ -496,13 +504,14 @@ int main(int argc, char** argv, char** env)
 		// Video window
 		ImGui::Begin(windowTitle_Video);
 		ImGui::SetWindowPos(windowTitle_Video, ImVec2(550, 0), ImGuiCond_Once);
-		ImGui::SetWindowSize(windowTitle_Video, ImVec2((VGA_WIDTH * VGA_SCALE_X) + 24, (VGA_HEIGHT * VGA_SCALE_Y) + 114), ImGuiCond_Once);
+		ImGui::SetWindowSize(windowTitle_Video, ImVec2((VGA_WIDTH * VGA_SCALE_X) + 24, (VGA_HEIGHT * VGA_SCALE_Y) + 130), ImGuiCond_Once);
 
 		ImGui::SliderFloat("Zoom", &vga_scale, 1, 8);
 		ImGui::SliderInt("Rotate", &video.output_rotate, -1, 1); ImGui::SameLine();
 		ImGui::Checkbox("Flip V", &video.output_vflip);
 		ImGui::Text("main_time: %d frame_count: %d sim FPS: %f", main_time, video.count_frame, video.stats_fps);
-		//ImGui::Text("pixel: %06d line: %03d", video.count_pixel, video.count_line);
+		ImGui::Text("pixel: %06d line: %03d", video.count_pixel, video.count_line);
+		ImGui::Text("xmax: %04d ymax: %04d", video.stats_xMax, video.stats_yMax);
 
 		//float vol_l = ((signed short)(top->AUDIO_L) / 256.0f) / 256.0f;
 		//float vol_r = ((signed short)(top->AUDIO_R) / 256.0f) / 256.0f;
@@ -513,24 +522,23 @@ int main(int argc, char** argv, char** env)
 		ImGui::Image(video.texture_id, ImVec2(video.output_width * VGA_SCALE_X, video.output_height * VGA_SCALE_Y));
 		ImGui::End();
 
-
 		//ImGui::Begin("rom_lsb");
 		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 1024, 0);
 		//ImGui::End();
 		//ImGui::Begin("rom_msb");
 		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 1024, 0);
 		//ImGui::End();
-		ImGui::Begin("ram");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__ram__DOT__mem, 1024, 0);
-		ImGui::End();
-		ImGui::Begin("sram");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__sram__DOT__mem, 256, 0);
-		ImGui::End();
+		//ImGui::Begin("ram");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__ram__DOT__mem, 1024, 0);
+		//ImGui::End();
+		//ImGui::Begin("sram");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__sram__DOT__mem, 256, 0);
+		//ImGui::End();
 		//ImGui::Begin("prom_lsb");
-		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 256, 0);
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 512, 0);
 		//ImGui::End();
 		//ImGui::Begin("prom_msb");
-		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 256, 0);
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 512, 0);
 		//ImGui::End();
 
 		// ImGui::Begin("ROM");
@@ -548,6 +556,10 @@ int main(int argc, char** argv, char** env)
 				top->inputs |= (1 << i);
 			}
 		}
+
+		top->IN0 = 255 ^ ((input.inputs[input_start_1]) << 7);
+		top->IN1 = 0b11111111;
+		top->IN2 = 255;
 
 		// Run simulation
 		if (run_enable)

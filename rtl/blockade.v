@@ -12,7 +12,10 @@ module blockade (
 	output vblank,
 	output hblank,
 
-	input [7:0] buttons,
+	input [7:0] in0,
+	input [7:0] in1,
+	input [7:0] in2,
+
 	input [13:0] dn_addr,
 	input 		 dn_wr,
 	input [7:0]  dn_data
@@ -39,11 +42,31 @@ ttl_74160 u31
 );
 
 // Output pixel clock
-assign ce_pix = u31_qa;
-reg ce_pix_last;
+
+assign ce_pix = VIDEO_CLOCK;
+reg VIDEO_CLOCK;
+reg VIDEO_CLOCK_last;
+
+reg [3:0] ce_count;
+
+//reg ce_pix_last;
 always @(posedge clk) begin
-	ce_pix_last <= ce_pix;
+	//ce_pix_last <= ce_pix;
+
+	if(ce_count == 4'd9)
+		ce_count <= 4'b0;
+	else
+		ce_count <= ce_count + 1'b1;
+
+	VIDEO_CLOCK <= ce_count[1:0] == 2'b00;
+
+	VIDEO_CLOCK_last <= VIDEO_CLOCK;
+	//$display("%d - d: %b, c: %b, b: %b, a: %b  p1: %b p2: %b", {u31_qd, u31_qc, u31_qb, u31_qa}, u31_qd, u31_qc, u31_qb, u31_qa, PHI_1, PHI_2);
+	//$display("CE_COUNT: %b  p1: %b p2: %b vc: %b  u18_1: %b u18_2: %b u8_1: %b u8_2: %b", ce_count, PHI_1, PHI_2, VIDEO_CLOCK, u18_1, u18_2, u8_1, u8_2);
+	// $display("CE_COUNT: %b  p1: %b p2: %b vc: %b  u8_1: %b u8_2: %b", ce_count, PHI_1, PHI_2, VIDEO_CLOCK, u8_1, u8_2);
 end
+wire PHI_1 = ce_count[3:1] == 3'b000;
+wire PHI_2 = ce_count >= 4'd3 && ce_count <= 4'd8;
 
 // U17 - 7442 BCD to decimal decoder
 wire [9:0] u17_q;
@@ -58,47 +81,99 @@ ttl_7442 u17
 
 // U18 2x NAND
 /* verilator lint_off UNOPTFLAT */
-wire u18_1 = ~(u17_q[0] && u18_2);
-wire u18_2 = ~(u17_q[2] && u18_1);
+// wire u18_1 = ~(u17_q[0] && u18_2);
+// wire u18_2 = ~(u17_q[2] && u18_1);
 /* verilator lint_on UNOPTFLAT */
 
 // U8 2x NAND
 /* verilator lint_off UNOPTFLAT */
-wire u8_1 = ~(u17_q[3] && u8_2);
-wire u8_2 = ~(u17_q[9] && u8_1);
+// wire u8_1 = ~(u17_q[3] && u8_2);
+// wire u8_2 = ~(u17_q[9] && u8_1);
 /* verilator lint_on UNOPTFLAT */
 
 // U45 AND
-wire u45 = u18_1 && SYNC;
-
-// U21_2
-// wire u56_reset = (u58_count == 9'd261);
-// always @(posedge clk) begin
-
-// end
-// reg u56_2_n = 
-// reg READY = ~(a12_n_a15 && u56_2_n);
+//wire u45 = u18_1 && SYNC;
+wire u45 = PHI_1 && SYNC;
 
 // U9 D flip-flop
+// wire u9_d = (~VBLANK_N || !a12_n_a15);
+wire u9_d = (~VBLANK_N);
 reg u9_q;
+//reg u56_q_n;
+//wire READY = ~(u56_q_n && a12_n_a15);
+//reg u8_1_last;
+reg VRESET_N_last;
+reg PHI_2_last;
+
+reg a12_n_a15_last;
+
 always @(posedge clk) begin
-	if(reset) 
+
+	if(reset)
 	begin
-		u9_q <= 1'b0;
+	 	u9_q <= 1'b1;
+//		u56_q_n <= 1'b0;
 	end
 	else
 	begin
-		if(!VBLANK_N && VBLANK_N_last)
+		PHI_2_last <= PHI_2;
+		if(PHI_2 && !PHI_2_last)
 		begin
-			u9_q <= 1'b1;
-			$display("READY LATCH");
-		end 
-		
-		if(VBLANK_N && !VBLANK_N_last)
-		begin
-			u9_q <= 1'b0;
-			$display("READY UNLATCH");
-		end 
+			u9_q <= u9_d;
+		end
+		// a12_n_a15_last <= a12_n_a15;
+		// if(a12_n_a15 != a12_n_a15_last)
+		// begin
+		// 	$display("a12_n_a15: %b  vcnt=%d", a12_n_a15, vcnt);
+		// end
+
+		// if(a12_n_a15 && VBLANK_N)
+		// begin
+		// 	$display("a12_n_a15 IN VBLANK  u9_q=%b", u9_q);
+		// end
+
+	 	// if(!VBLANK_N && VBLANK_N_last)
+		// begin
+		// 	u56_q_n <= 1'b0;
+	 	// 	$display("READY going low: vcnt=%d", vcnt);
+		// end
+
+		// VRESET_N_last <= VRESET_N;
+		// if(!VRESET_N && VRESET_N_last)
+		// begin
+		// 	u56_q_n <= 1'b1;
+		// 	$display("READY going high: vcnt=%d", vcnt);
+		// end
+
+		// u8_1_last <= u8_1;
+		// if(u8_1 && !u8_1_last)
+		// begin
+		// 	u9_q <= !VBLANK_N;
+		// 	// u9_q <= READY;
+		// end
+
+		// if(u21_2)
+		// begin
+		// 	u9_q <= 1'b1;
+		// end
+		// if(VIDEO_CLOCK && !VIDEO_CLOCK_last)
+		// begin
+		// 	if(!VBLANK_N && VBLANK_N_last)
+		// 	begin
+		// 		u9_q <= 1'b1;
+		// 		$display("Entering VBLANK: hcnt=%d  vcnt=%d", hcnt, vcnt);
+		// 	end
+
+		// 	if(VBLANK_N && !VBLANK_N_last)
+		// 	begin
+		// 		u9_q <= 1'b0;
+		// 		$display("Leaving VBLANK: hcnt=%d  vcnt=%d", hcnt, vcnt);
+		// 	end
+		// end
+		// if(!VBLANK_N)
+		// begin
+		// 	//$display("hcnt=%d  vcnt=%d   hblank=%b a12_n_a15=%b u21_2=%b u9_q=%b", hcnt, vcnt, hblank, a12_n_a15, u21_2, u9_q);
+		// end
 	end
 end
 
@@ -111,22 +186,22 @@ wire sram_cs = ADDR[15] && ADDR[12];
 wire ram_we = ram_cs && !WR_N;
 wire sram_we = sram_cs && !WR_N;
 
-wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? 8'hFF : // IN0
-							(ADDR[1:0] == 2'd1) ? 8'hFF : // IN1
-							(ADDR[1:0] == 2'd2) ? 8'hFF : // IN2
+wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? in0 : // IN0
+							(ADDR[1:0] == 2'd1) ? in1 : // IN1
+							(ADDR[1:0] == 2'd2) ? in2 : // IN2
 							8'h00;
 
 // CPU
-wire [7:0] cpu_data_in = INP ? inp_data_out : 
+wire [7:0] cpu_data_in = INP ? inp_data_out :
 						 rom_cs ? rom_data_out :
-						 ram_cs ? ram_data_out : 
-						 sram_cs ? sram_data_out : 
+						 ram_cs ? ram_data_out :
+						 sram_cs ? sram_data_out :
 						 8'h00;
 
 reg [7:0] cpu_data_out;
 
-wire PHI_1 = ~u18_2;
-wire PHI_2 = ~u8_2;
+// wire PHI_1 = ~u18_2;
+// wire PHI_2 = ~u8_2;
 wire [15:0] ADDR;
 wire [7:0] DATA;
 wire DBIN;
@@ -163,28 +238,39 @@ end
 reg [8:0] u52_count;
 reg u53_rco_last;
 reg s_64H_last;
-wire s_1H = u52_count[0];
-wire s_2H = u52_count[1];
-wire s_4H = u52_count[2];
-wire s_8H = u52_count[3];
-wire s_16H = u52_count[4];
-wire s_32H = u52_count[5];
-wire s_64H = u52_count[6];
-wire s_128H = u52_count[7];
-wire s_256H = u52_count[8];
+
+
 localparam HBLANK_START = 9'd255;
 localparam HSYNC_START = 9'd272;
 localparam HSYNC_END = 9'd300;
-wire HRESET_N = ~(u52_count == 9'd329);
-reg HBLANK_N;
-reg HSYNC_N;
+localparam HRESET_LINE = 9'd329;
+localparam VBLANK_START = 9'd224;
+localparam VSYNC_START = 9'd254;
+localparam VRESET_LINE = 9'd261;
+
+//wire [8:0] hcnt = (u52_count == HSYNC_END) ? 9'b0 : u52_count + 9'd1;
+wire [8:0] hcnt = (u52_count == HSYNC_END - 9'b1) ? 9'b0 : u52_count;
+
+wire s_1H = hcnt[0];
+wire s_2H = hcnt[1];
+wire s_4H = hcnt[2];
+wire s_8H = hcnt[3];
+wire s_16H = hcnt[4];
+wire s_32H = hcnt[5];
+wire s_64H = hcnt[6];
+wire s_128H = hcnt[7];
+wire s_256H = hcnt[8];
+wire HRESET_N = ~(u52_count == HRESET_LINE);
+reg HBLANK_N = 1'b1;
+reg HSYNC_N_last = 1'b1;
+reg HSYNC_N = 1'b1;
 
 always @(posedge clk)
 begin
 	// U52 1
-	if(ce_pix && !ce_pix_last)
+	if(VIDEO_CLOCK && !VIDEO_CLOCK_last)
 	begin
-		if (!HRESET_N) 
+		if (!HRESET_N)
 		begin
 			u52_count <= 9'b0000;
 			HBLANK_N <= 1'b1;
@@ -204,40 +290,45 @@ wire u63 = ~(s_16H && s_256H);
 
 // U58 - Dual binary counters
 reg [8:0] u58_count;
-reg HSYNC_N_last;
-reg VRESET_N;
-reg VSYNC_N;
-wire s_1V = u58_count[0];
-wire s_2V = u58_count[1];
-wire s_4V = u58_count[2];
-wire s_8V = u58_count[3];
-wire s_16V = u58_count[4];
-wire s_32V = u58_count[5];
-wire s_64V = u58_count[6];
-wire s_128V = u58_count[7];
-wire s_256V = u58_count[8];
 
-reg VBLANK_N_last;
-wire VBLANK_N = u58_count < 9'd224;
+wire [8:0] vcnt = u58_count;// - 9'd2;
+
+wire s_1V = vcnt[0];
+wire s_2V = vcnt[1];
+wire s_4V = vcnt[2];
+wire s_8V = vcnt[3];
+wire s_16V = vcnt[4];
+wire s_32V = vcnt[5];
+wire s_64V = vcnt[6];
+wire s_128V = vcnt[7];
+wire s_256V = vcnt[8];
+
+reg VBLANK_N_last = 1'b1;
+reg VBLANK_N = 1'b1;
+reg VSYNC_N = 1'b1;
+wire VRESET_N = ~(u58_count == VRESET_LINE);
 
 always @(posedge clk)
 begin
-	VBLANK_N_last <= VBLANK_N;
-	// U58 1
-	HSYNC_N_last <= HSYNC_N;
-	if(HSYNC_N && !HSYNC_N_last)
+	if(VIDEO_CLOCK && !VIDEO_CLOCK_last)
 	begin
-		if (!VRESET_N) 
+		// U58 1
+		VBLANK_N_last <= VBLANK_N;
+		HSYNC_N_last <= HSYNC_N;
+		if(HSYNC_N && !HSYNC_N_last)
 		begin
-			u58_count <= 9'b0000;
+			//VRESET_N <= ~(u58_count == 9'd261);
+			if (!VRESET_N)
+			begin
+				u58_count <= 9'b0;
+			end
+			else
+			begin
+				u58_count <= u58_count + 9'b1;
+			end
+			VBLANK_N <= ~(u58_count >= VBLANK_START);
+			VSYNC_N <= ~(u58_count >= VSYNC_START );
 		end
-		else
-		begin
-			u58_count <= u58_count + 9'b1;
-		end
-		//$display("u58_count=%d  VSYNC_N=%b  VBLANK_N=%b  VRESET_N=%b", u58_count, VSYNC_N, VBLANK_N, VRESET_N);
-		VSYNC_N <= ~(u58_count > 9'd254);
-		VRESET_N <= ~(u58_count == 9'd261);
 	end
 end
 
@@ -249,7 +340,6 @@ reg l_D3;
 always @(posedge clk) begin
 	if(u45)
 	begin
-		//$display("Latching data to U51: D=%b D7=%b D6=%b D4=%b D3=%b", DATA, l_D7, l_D6, l_D4, l_D3);
 		l_D7 <= DATA[7];
 		l_D6 <= DATA[6];
 		l_D4 <= DATA[4];
@@ -258,43 +348,36 @@ always @(posedge clk) begin
 end
 
 // U45_1
-reg OUTP = l_D4 && ~WR_N;
+wire OUTP = l_D4 && ~WR_N;
 // U44_1
-reg MEMW = (l_D3 && ~WR_N);
+wire MEMW = (l_D3 && ~WR_N);
 // U45_2
-reg INP = (l_D6 && DBIN);
+wire INP = (l_D6 && DBIN);
 // U44_2
-reg MEMR = (l_D7 && DBIN);
+wire MEMR = (l_D7 && DBIN);
 
 // U21
 wire a12_n_a15 = ADDR[15] && ~ADDR[12];
-reg ram_WR_n = ~(MEMW && a12_n_a15);
+wire ram_WR_n = ~(MEMW && a12_n_a15);
 
 assign hsync = ~HSYNC_N;
 assign hblank = ~HBLANK_N;
 assign vblank = ~VBLANK_N;
 assign vsync = ~VSYNC_N;
 
-assign g = prom_data_out[{ s_4H, s_2H, s_1H }];
+wire [2:0] prom_col = 3'b111-{ s_4H, s_2H, s_1H };
+assign r = s_8H;
+assign g = prom_data_out[prom_col];
+//assign g = s_1V;
+assign b = s_8V;
 
-always @(posedge clk) begin
-	if(!reset)
-	begin
-		if(!rom_cs)
-		begin
-			$display("ADDR=%x DATA=%b rom=%b ram=%b sram=%b MEMW=%b WR_N=%b DBIN=%b RAMA=%x VBL=%b", ADDR, DATA, rom_cs, ram_cs, sram_cs, MEMW, WR_N, DBIN, ram_addr, vblank);
-		end
-		// if(!WR_N)
-		// begin
-		// 	$display("CPUWR > ADDR=%x DATA=%x a12_n_a15=%b ram_WR_n=%b MEMW=%b ram_cs=%b", ADDR, DATA, a12_n_a15, ram_WR_n, MEMW, ram_cs);
-		// 	$display("ADDR=%x DATA=%x rom=%b ram=%b sram=%b", ADDR, cpu_data_in, rom_cs, ram_cs, sram_cs);
-		// end
-		//  if(DBIN)
-		//  begin
-
-		//  end
-	end
-end
+// always @(posedge clk)
+// begin
+// 	if(VBLANK_N)
+// 	begin
+// 		g <= prom_data_out[prom_col];
+// 	end
+// end
 
 // U1 - 7442 BCD to decimal decoder
 wire [9:0] u1_q;
@@ -307,7 +390,6 @@ ttl_7442 u1
 	.o(u1_q)
 );
 wire CS0_N = u1_q[0];
-
 
 // MEMORY
 // ------
@@ -390,8 +472,9 @@ wire [3:0] prom_data_out_lsb;
 wire [3:0] prom_data_out_msb;
 wire [7:0] prom_data_out = { prom_data_out_msb, prom_data_out_lsb } ;
 /* verilator lint_off SELRANGE */
-wire [7:0] prom_addr = { ram_data_out[0:4], s_4V, s_2V, s_1V };
+wire [7:0] prom_addr = { ram_data_out[4:0], s_4V, s_2V, s_1V };
 /* verilator lint_on SELRANGE */
+
 dpram #(8,4, "316-0001.u43.hex") prom_lsb
 (
 	.clock_a(clk),
