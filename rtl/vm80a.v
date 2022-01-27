@@ -1,3 +1,4 @@
+`timescale 1 ps / 1 ps
 //
 // Copyright (c) 2014-2018 by 1801BM1@gmail.com
 // Licensed under CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/)

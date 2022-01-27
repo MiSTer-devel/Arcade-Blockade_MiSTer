@@ -34,7 +34,7 @@ using namespace std;
 // ------------------
 int initialReset = 48;
 bool run_enable = 1;
-int batchSize = 25000000 / 100000;
+int batchSize = 25000000 / 10000;
 bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
@@ -100,7 +100,7 @@ void resetSim()
 
 // MAME debug log
 
-bool log_instructions = true;
+bool log_instructions = false;
 bool stop_on_log_mismatch = true;
 bool break_vbl = 1;
 

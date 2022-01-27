@@ -1,6 +1,6 @@
 #export OPTIMIZE="-O3 --x-assign fast --x-initial fast --noassert"
 export OPTIMIZE="--x-assign fast --x-initial fast --noassert"
-export WARNINGS="-Wno-TIMESCALEMOD"
+#export WARNINGS="-Wno-TIMESCALEMOD"
 
 set -e
 if grep -qEi "(Microsoft|WSL)" /proc/version &> /dev/null ; then

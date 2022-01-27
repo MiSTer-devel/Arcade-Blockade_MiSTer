@@ -1,3 +1,4 @@
+`timescale 1 ps / 1 ps
 
 module blockade (
 	input clk,
@@ -22,26 +23,27 @@ module blockade (
 );
 
 // U31 - 74160 decade counter
-wire u31_qa;
-wire u31_qb;
-wire u31_qc;
-wire u31_qd;
-ttl_74160 u31
-(
-	.Clk(clk),
-	.Clear_bar(1'b1),
-	.Load_bar(1'b1),
-	.ENP(1'b1),
-	.ENT(1'b1),
-	.D(),
-	.RCO(),
-	.QA(u31_qa),
-	.QB(u31_qb),
-	.QC(u31_qc),
-	.QD(u31_qd)
-);
+// wire u31_qa;
+// wire u31_qb;
+// wire u31_qc;
+// wire u31_qd;
+// ttl_74160 u31
+// (
+// 	.Clk(clk),
+// 	.Clear_bar(1'b1),
+// 	.Load_bar(1'b1),
+// 	.ENP(1'b1),
+// 	.ENT(1'b1),
+// 	.D(),
+// 	.RCO(),
+// 	.QA(u31_qa),
+// 	.QB(u31_qb),
+// 	.QC(u31_qc),
+// 	.QD(u31_qd)
+// );
 
-// Output pixel clock
+// Generate video and CPU enables
+// - Replaces U31, U17, U8, U18 section of circuit
 
 assign ce_pix = VIDEO_CLOCK;
 reg VIDEO_CLOCK;
@@ -69,40 +71,26 @@ wire PHI_1 = ce_count[3:1] == 3'b000;
 wire PHI_2 = ce_count >= 4'd3 && ce_count <= 4'd8;
 
 // U17 - 7442 BCD to decimal decoder
-wire [9:0] u17_q;
-ttl_7442 u17
-(
-	.a(u31_qa),
-	.b(u31_qb),
-	.c(u31_qc),
-	.d(u31_qd),
-	.o(u17_q)
-);
-
-// U18 2x NAND
-/* verilator lint_off UNOPTFLAT */
-// wire u18_1 = ~(u17_q[0] && u18_2);
-// wire u18_2 = ~(u17_q[2] && u18_1);
-/* verilator lint_on UNOPTFLAT */
-
-// U8 2x NAND
-/* verilator lint_off UNOPTFLAT */
-// wire u8_1 = ~(u17_q[3] && u8_2);
-// wire u8_2 = ~(u17_q[9] && u8_1);
-/* verilator lint_on UNOPTFLAT */
+// wire [9:0] u17_q;
+// ttl_7442 u17
+// (
+// 	.a(u31_qa),
+// 	.b(u31_qb),
+// 	.c(u31_qc),
+// 	.d(u31_qd),
+// 	.o(u17_q)
+// );
 
 // U45 AND
-//wire u45 = u18_1 && SYNC;
 wire u45 = PHI_1 && SYNC;
 
 // U9 D flip-flop
 // wire u9_d = (~VBLANK_N || !a12_n_a15);
-wire u9_d = (~VBLANK_N);
+// wire u9_d = (~VBLANK_N);
 reg u9_q;
 //reg u56_q_n;
 //wire READY = ~(u56_q_n && a12_n_a15);
-//reg u8_1_last;
-reg VRESET_N_last;
+// reg VRESET_N_last;
 reg PHI_2_last;
 
 reg a12_n_a15_last;
@@ -116,11 +104,22 @@ always @(posedge clk) begin
 	end
 	else
 	begin
-		PHI_2_last <= PHI_2;
+		// PHI_2_last <= PHI_2;
 		if(PHI_2 && !PHI_2_last)
 		begin
-			u9_q <= u9_d;
+			if(VBLANK_N && a12_n_a15)
+				u9_q <= 1'b0;
+			else
+				u9_q <= 1'b1;
 		end
+		//if(PHI_2 && !PHI_2_last)
+		// begin
+			// Leaving VBLANK, resume CPU
+			// if(!VRESET_N)
+			// 	u9_q <= 1'b1;
+			// else if(!VBLANK_N)
+			// 	u9_q <= 1'b0;
+		// end
 		// a12_n_a15_last <= a12_n_a15;
 		// if(a12_n_a15 != a12_n_a15_last)
 		// begin
@@ -143,13 +142,6 @@ always @(posedge clk) begin
 		// begin
 		// 	u56_q_n <= 1'b1;
 		// 	$display("READY going high: vcnt=%d", vcnt);
-		// end
-
-		// u8_1_last <= u8_1;
-		// if(u8_1 && !u8_1_last)
-		// begin
-		// 	u9_q <= !VBLANK_N;
-		// 	// u9_q <= READY;
 		// end
 
 		// if(u21_2)
@@ -200,8 +192,6 @@ wire [7:0] cpu_data_in = INP ? inp_data_out :
 
 reg [7:0] cpu_data_out;
 
-// wire PHI_1 = ~u18_2;
-// wire PHI_2 = ~u8_2;
 wire [15:0] ADDR;
 wire [7:0] DATA;
 wire DBIN;
@@ -244,12 +234,15 @@ localparam HBLANK_START = 9'd255;
 localparam HSYNC_START = 9'd272;
 localparam HSYNC_END = 9'd300;
 localparam HRESET_LINE = 9'd329;
+
 localparam VBLANK_START = 9'd224;
 localparam VSYNC_START = 9'd254;
 localparam VRESET_LINE = 9'd261;
+localparam VBLANK_END = 9'd261;
 
 //wire [8:0] hcnt = (u52_count == HSYNC_END) ? 9'b0 : u52_count + 9'd1;
-wire [8:0] hcnt = (u52_count == HSYNC_END - 9'b1) ? 9'b0 : u52_count;
+//wire [8:0] hcnt = (u52_count == HSYNC_END - 9'b1) ? 9'b0 : u52_count;
+wire [8:0] hcnt = u52_count;
 
 wire s_1H = hcnt[0];
 wire s_2H = hcnt[1];
@@ -320,14 +313,40 @@ begin
 			//VRESET_N <= ~(u58_count == 9'd261);
 			if (!VRESET_N)
 			begin
-				u58_count <= 9'b0;
+				u58_count = 9'b0;
 			end
 			else
 			begin
-				u58_count <= u58_count + 9'b1;
+				u58_count = u58_count + 9'b1;
 			end
-			VBLANK_N <= ~(u58_count >= VBLANK_START);
-			VSYNC_N <= ~(u58_count >= VSYNC_START );
+			VBLANK_N = ~(u58_count >= VBLANK_START);
+			VSYNC_N = ~(u58_count >= VSYNC_START);
+		end
+	end
+end
+
+// U21
+wire a12_n_a15 = ADDR[15] && ~ADDR[12];
+wire ram_WR_n = ~(MEMW && a12_n_a15);
+
+assign hsync = ~HSYNC_N;
+assign hblank = ~HBLANK_N;
+assign vblank = ~VBLANK_N;
+assign vsync = ~VSYNC_N;
+
+wire [2:0] prom_col = (3'b111 - { s_4H, s_2H, s_1H });
+assign r = 1'b0;
+assign g = (VBLANK_N && HBLANK_N) ? prom_data_out[prom_col] : 1'b0;
+assign b = 1'b0;
+
+always @(posedge clk) begin
+	if(VIDEO_CLOCK && !VIDEO_CLOCK_last)
+	begin
+		if(hcnt == 9'd0)
+		begin
+			//$display("v: %d h: %d  ce_pix: %b  prom_col: %d  prom_data: %b  prom: %b" , vcnt, hcnt, ce_pix, prom_col, prom_data_out, prom_data_out[prom_col]);
+			//$display("VBLANK_N: %b  VBLANK_N_last: %b", VBLANK_N, VBLANK_N_last);
+			$display("vcnt: %d  vblank: %b / %b vsync: %b", vcnt, ~VBLANK_N,  ~VBLANK_N_last, ~VSYNC_N);
 		end
 	end
 end
@@ -356,28 +375,6 @@ wire INP = (l_D6 && DBIN);
 // U44_2
 wire MEMR = (l_D7 && DBIN);
 
-// U21
-wire a12_n_a15 = ADDR[15] && ~ADDR[12];
-wire ram_WR_n = ~(MEMW && a12_n_a15);
-
-assign hsync = ~HSYNC_N;
-assign hblank = ~HBLANK_N;
-assign vblank = ~VBLANK_N;
-assign vsync = ~VSYNC_N;
-
-wire [2:0] prom_col = 3'b111-{ s_4H, s_2H, s_1H };
-assign r = s_8H;
-assign g = prom_data_out[prom_col];
-//assign g = s_1V;
-assign b = s_8V;
-
-// always @(posedge clk)
-// begin
-// 	if(VBLANK_N)
-// 	begin
-// 		g <= prom_data_out[prom_col];
-// 	end
-// end
 
 // U1 - 7442 BCD to decimal decoder
 wire [9:0] u1_q;
@@ -429,23 +426,24 @@ dpram #(10,4, "316-0004.u2.hex") rom_msb
 
 // RAM
 wire [7:0]	ram_data_out;
+wire [7:0]	vram_data_out;
 wire [7:0]	ram_data_in = cpu_data_out;
 wire [9:0]  vram_read_addr = { s_128V, s_64V, s_32V, s_16V, s_8V, s_128H, s_64H, s_32H, s_16H, s_8H };
-wire [9:0]  ram_addr = vblank ? ADDR[9:0] : vram_read_addr;
+wire [9:0]  ram_addr = { ADDR[9:0] };
 
 dpram #(10,8) ram
 (
 	.clock_a(clk),
-	.address_a(ram_addr),
-	.wren_a(ram_we),
-	.data_a(ram_data_in),
-	.q_a(ram_data_out),
+	.address_a(vram_read_addr),
+	.wren_a(),
+	.data_a(),
+	.q_a(vram_data_out),
 
 	.clock_b(clk),
-	.address_b(),
-	.wren_b(),
-	.data_b(),
-	.q_b()
+	.address_b(ram_addr),
+	.wren_b(ram_we),
+	.data_b(ram_data_in),
+	.q_b(ram_data_out)
 );
 
 // 2111 static RAM
@@ -472,7 +470,7 @@ wire [3:0] prom_data_out_lsb;
 wire [3:0] prom_data_out_msb;
 wire [7:0] prom_data_out = { prom_data_out_msb, prom_data_out_lsb } ;
 /* verilator lint_off SELRANGE */
-wire [7:0] prom_addr = { ram_data_out[4:0], s_4V, s_2V, s_1V };
+wire [7:0] prom_addr = { vram_data_out[4:0], s_4V, s_2V, s_1V };
 /* verilator lint_on SELRANGE */
 
 dpram #(8,4, "316-0001.u43.hex") prom_lsb

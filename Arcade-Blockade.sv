@@ -203,7 +203,7 @@ assign VIDEO_ARY = (!ar) ? 12'd5 : 12'd0;
 
 `include "build_id.v" 
 localparam CONF_STR = {
-	"A.DOTRIKUN;;",
+	"A.BLOCKADE;;",
 	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",  
 	"-;",
