@@ -272,7 +272,7 @@ int verilate()
 			if (clk_sys.clk) { bus.AfterEval(); }
 
 #ifdef CPU_DEBUG
-			if (!top->reset ) {
+			if (!top->reset) {
 				cpu_sync = top->emu__DOT__blockade__DOT__SYNC;
 
 				unsigned short pc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_pc;
@@ -510,13 +510,13 @@ int main(int argc, char** argv, char** env)
 		ImGui::SliderInt("Rotate", &video.output_rotate, -1, 1); ImGui::SameLine();
 		ImGui::Checkbox("Flip V", &video.output_vflip);
 		ImGui::Text("main_time: %d frame_count: %d sim FPS: %f", main_time, video.count_frame, video.stats_fps);
-		ImGui::Text("pixel: %06d line: %03d", video.count_pixel, video.count_line);
-		ImGui::Text("xmax: %04d ymax: %04d", video.stats_xMax, video.stats_yMax);
 
+#ifdef DEBUG_AUDIO
 		//float vol_l = ((signed short)(top->AUDIO_L) / 256.0f) / 256.0f;
 		//float vol_r = ((signed short)(top->AUDIO_R) / 256.0f) / 256.0f;
 		//ImGui::ProgressBar(vol_l + 0.5, ImVec2(200, 16), 0); ImGui::SameLine();
 		//ImGui::ProgressBar(vol_r + 0.5, ImVec2(200, 16), 0);
+#endif
 
 		// Draw VGA output
 		ImGui::Image(video.texture_id, ImVec2(video.output_width * VGA_SCALE_X, video.output_height * VGA_SCALE_Y));
@@ -540,10 +540,6 @@ int main(int argc, char** argv, char** env)
 		//ImGui::Begin("prom_msb");
 		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 512, 0);
 		//ImGui::End();
-
-		// ImGui::Begin("ROM");
-		// memoryEditor_hs.DrawContents(&top->top__DOT__blockade__DOT__MEM_ROM__DOT__ram, 4096, 0);
-		// ImGui::End();
 
 		video.UpdateTexture();
 

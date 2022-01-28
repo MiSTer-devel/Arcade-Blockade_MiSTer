@@ -412,18 +412,17 @@ void SimVideo::Clock(bool hblank, bool vblank, bool hsync, bool vsync, uint32_t 
 	bool vb_falling = (!vblank && last_vblank);
 	bool vb_rising = (vblank && !last_vblank);
 
-	// Next line on end of hblank
-	if (hb_falling) {
-		// Increment line and reset pixel count
-		count_line++;
-		count_pixel = 0;
-	}
-
-	//else {
+	if (!vblank) {
+		// Next line on end of hblank
+		if (hb_falling) {
+			// Increment line and reset pixel count
+			count_line++;
+			count_pixel = 0;
+		}
 		if (de) {
 			count_pixel++;
 		}
-	//}
+	}
 
 	//frame_ready = 1;
 	// Reset on rising vsync
