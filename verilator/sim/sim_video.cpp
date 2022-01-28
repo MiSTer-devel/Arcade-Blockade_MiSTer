@@ -425,11 +425,12 @@ void SimVideo::Clock(bool hblank, bool vblank, bool hsync, bool vsync, uint32_t 
 		}
 	//}
 
-	frame_ready = 1;
+	//frame_ready = 1;
 	// Reset on rising vsync
 	if (last_vsync && !vsync) {
 		count_frame++;
 		count_line = 0;
+		frame_ready = 1;
 #ifdef WIN32
 		GetSystemTime(&actualtime);
 		time_ms = (actualtime.wSecond * 1000) + actualtime.wMilliseconds;

@@ -34,14 +34,14 @@ using namespace std;
 // ------------------
 int initialReset = 48;
 bool run_enable = 1;
-int batchSize = 25000000 / 10000;
+int batchSize = 25000000 / 100;
 bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
 
 // Debug GUI 
 // ---------
-const char* windowTitle = "Verilator Sim: Aznable";
+const char* windowTitle = "Verilator Sim: Sega/Gremlin - Blockade";
 const char* windowTitle_Control = "Simulation control";
 const char* windowTitle_DebugLog = "Debug log";
 const char* windowTitle_Video = "VGA output";
@@ -72,7 +72,7 @@ const int input_pause = 11;
 // Video
 // -----
 #define VGA_WIDTH 256
-#define VGA_HEIGHT 225
+#define VGA_HEIGHT 224
 #define VGA_ROTATE 0  // 90 degrees anti-clockwise
 #define VGA_SCALE_X vga_scale
 #define VGA_SCALE_Y vga_scale
@@ -98,24 +98,32 @@ void resetSim()
 	clk_sys.Reset();
 }
 
-// MAME debug log
 
+// Audio
+//#define DEBUG_AUDIO
+#ifdef DEBUG_AUDIO
+SimClock clk_audio(2205);
+ofstream audioFile;
+#endif
+
+
+// MAME debug log
+//#define CPU_DEBUG
+
+#ifdef CPU_DEBUG
 bool log_instructions = false;
-bool stop_on_log_mismatch = true;
-bool break_vbl = 1;
+bool stop_on_log_mismatch = false;
 
 std::vector<std::string> log_mame;
 std::vector<std::string> log_cpu;
 long log_index;
 unsigned int ins_count = 0;
 
-
 // CPU debug
 bool cpu_sync;
 bool cpu_sync_last;
 std::vector<std::vector<std::string> > opcodes;
 std::map<std::string, std::string> opcode_lookup;
-
 
 bool writeLog(const char* line)
 {
@@ -232,6 +240,8 @@ unsigned char active_ins = 0;
 
 bool vbl_last;
 
+#endif
+
 int verilate()
 {
 
@@ -261,22 +271,9 @@ int verilate()
 			top->eval();
 			if (clk_sys.clk) { bus.AfterEval(); }
 
+#ifdef CPU_DEBUG
 			if (!top->reset ) {
 				cpu_sync = top->emu__DOT__blockade__DOT__SYNC;
-
-				//bool vbl = top->VGA_VB;
-				//if (vbl && !vbl_last)
-				//{
-				//	if (break_vbl) {
-				//		run_enable = 0;
-				//	}
-				//	console.AddLog("VBL");
-				//	console.AddLog("A=%02x", top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__acc);
-				//	console.AddLog("BC=%04x", top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_bc);
-				//	console.AddLog("DE=%04x", top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_de);
-				//	console.AddLog("HL=%04x", top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_hl);
-				//}
-				//vbl_last = vbl;
 
 				unsigned short pc = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__r16_pc;
 				unsigned char di = top->emu__DOT__blockade__DOT__cpu__DOT__core__DOT__di;
@@ -346,6 +343,7 @@ int verilate()
 
 				cpu_sync_last = cpu_sync;
 			}
+#endif
 
 		}
 
@@ -385,6 +383,7 @@ int main(int argc, char** argv, char** env)
 	Verilated::setDebug(console);
 #endif
 
+#ifdef CPU_DEBUG
 	// Load debug opcodes
 	loadOpcodes();
 
@@ -394,6 +393,7 @@ int main(int argc, char** argv, char** env)
 	while (getline(fin, line)) {
 		log_mame.push_back(line);
 	}
+#endif
 
 	// Attach bus
 	bus.ioctl_addr = &top->ioctl_addr;
@@ -436,10 +436,10 @@ int main(int argc, char** argv, char** env)
 	resetSim();
 
 	// Stage roms for this core
-	bus.QueueDownload("roms/blockade/316-0001.u43", 0);
+	/*bus.QueueDownload("roms/blockade/316-0001.u43", 0);
 	bus.QueueDownload("roms/blockade/316-0002.u29", 0);
 	bus.QueueDownload("roms/blockade/316-0003.u3", 0);
-	bus.QueueDownload("roms/blockade/316-0004.u2", 0);
+	bus.QueueDownload("roms/blockade/316-0004.u2", 0);*/
 
 #ifdef WIN32
 	MSG msg;
@@ -490,11 +490,11 @@ int main(int argc, char** argv, char** env)
 		//ImGui::SameLine();
 		ImGui::SliderInt("Multi step amount", &multi_step_amount, 8, 1024);
 
+#ifdef CPU_DEBUG
 		ImGui::NewLine();
-
 		ImGui::Checkbox("Log CPU instructions", &log_instructions);
 		ImGui::Checkbox("Stop on MAME diff", &stop_on_log_mismatch);
-		
+#endif
 
 		ImGui::End();
 
@@ -504,7 +504,7 @@ int main(int argc, char** argv, char** env)
 		// Video window
 		ImGui::Begin(windowTitle_Video);
 		ImGui::SetWindowPos(windowTitle_Video, ImVec2(550, 0), ImGuiCond_Once);
-		ImGui::SetWindowSize(windowTitle_Video, ImVec2((VGA_WIDTH * VGA_SCALE_X) + 24, (VGA_HEIGHT * VGA_SCALE_Y) + 130), ImGuiCond_Once);
+		ImGui::SetWindowSize(windowTitle_Video, ImVec2((VGA_WIDTH * VGA_SCALE_X) + 28, (VGA_HEIGHT * VGA_SCALE_Y) + 132), ImGuiCond_Once);
 
 		ImGui::SliderFloat("Zoom", &vga_scale, 1, 8);
 		ImGui::SliderInt("Rotate", &video.output_rotate, -1, 1); ImGui::SameLine();

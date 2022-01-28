@@ -24,7 +24,7 @@
 module dpram #(
 	parameter address_width = 10,
 	parameter data_width = 8,
-    parameter init_file= ""
+	parameter init_file= ""
 ) (
 	input	wire						clock_a,
 	input	wire						wren_a,
@@ -39,32 +39,27 @@ module dpram #(
 	output	reg		[data_width-1:0]	q_b
 );
 
-initial begin
-	if (init_file>0)
-	begin
-		// $display("Loading dpram from file:");
-		// $display(init_file);
-		$readmemh(init_file, mem);
-	end
-end
+	localparam ramLength = (2**address_width);
+	reg [data_width-1:0] mem [ramLength-1:0];
 
-localparam ramLength = (2**address_width);
-reg [data_width-1:0] mem [ramLength-1:0];
-
-always @(posedge clock_a) begin
-	q_a <= mem[address_a];
-	if(wren_a) begin
-		q_a <= data_a;
-		mem[address_a] <= data_a;
+	initial begin
+		if (init_file>0) $readmemh(init_file, mem);
 	end
-end
 
-always @(posedge clock_b) begin
-	q_b <= mem[address_b];
-	if(wren_b) begin
-		q_b <= data_b;
-		mem[address_b] <= data_b;
+	always @(posedge clock_a) begin
+		q_a <= mem[address_a];
+		if(wren_a) begin
+			q_a <= data_a;
+			mem[address_a] <= data_a;
+		end
 	end
-end
+
+	always @(posedge clock_b) begin
+		q_b <= mem[address_b];
+		if(wren_b) begin
+			q_b <= data_b;
+			mem[address_b] <= data_b;
+		end
+	end
 
 endmodule
