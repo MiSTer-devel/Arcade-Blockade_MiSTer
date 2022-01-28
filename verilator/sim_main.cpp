@@ -56,18 +56,18 @@ SimBus bus(console);
 // Input handling
 // --------------
 SimInput input(12, console);
-const int input_right = 0;
-const int input_left = 1;
-const int input_down = 2;
-const int input_up = 3;
-const int input_fire1 = 4;
-const int input_fire2 = 5;
-const int input_start_1 = 6;
-const int input_start_2 = 7;
+
+const int input_p1_right = 0;
+const int input_p1_left = 1;
+const int input_p1_down = 2;
+const int input_p1_up = 3;
+
+const int input_p2_right = 4;
+const int input_p2_left = 5;
+const int input_p2_down = 6;
+const int input_p2_up = 7;
+
 const int input_coin_1 = 8;
-const int input_coin_2 = 9;
-const int input_coin_3 = 10;
-const int input_pause = 11;
 
 // Video
 // -----
@@ -408,22 +408,20 @@ int main(int argc, char** argv, char** env)
 	// Set up input module
 	input.Initialise();
 #ifdef WIN32
-	input.SetMapping(input_up, DIK_UP);
-	input.SetMapping(input_right, DIK_RIGHT);
-	input.SetMapping(input_down, DIK_DOWN);
-	input.SetMapping(input_left, DIK_LEFT);
-	input.SetMapping(input_fire1, DIK_LCONTROL);
-	input.SetMapping(input_fire2, DIK_LALT);
-	input.SetMapping(input_start_1, DIK_1);
+	input.SetMapping(input_p1_up, DIK_UP);
+	input.SetMapping(input_p1_right, DIK_RIGHT);
+	input.SetMapping(input_p1_down, DIK_DOWN);
+	input.SetMapping(input_p1_left, DIK_LEFT);
+	input.SetMapping(input_p2_up, DIK_W);
+	input.SetMapping(input_p2_right, DIK_D);
+	input.SetMapping(input_p2_down, DIK_S);
+	input.SetMapping(input_p2_left, DIK_A);
 	input.SetMapping(input_coin_1, DIK_5);
 #else
 	input.SetMapping(input_up, SDL_SCANCODE_UP);
 	input.SetMapping(input_right, SDL_SCANCODE_RIGHT);
 	input.SetMapping(input_down, SDL_SCANCODE_DOWN);
 	input.SetMapping(input_left, SDL_SCANCODE_LEFT);
-	input.SetMapping(input_fire1, SDL_SCANCODE_LCONTROL);
-	input.SetMapping(input_fire2, SDL_SCANCODE_LALT);
-	input.SetMapping(input_start_1, SDL_SCANCODE_1);
 	input.SetMapping(input_coin_1, SDL_SCANCODE_3);
 #endif
 	// Setup video output
@@ -512,10 +510,10 @@ int main(int argc, char** argv, char** env)
 		ImGui::Text("main_time: %d frame_count: %d sim FPS: %f", main_time, video.count_frame, video.stats_fps);
 
 #ifdef DEBUG_AUDIO
-		//float vol_l = ((signed short)(top->AUDIO_L) / 256.0f) / 256.0f;
-		//float vol_r = ((signed short)(top->AUDIO_R) / 256.0f) / 256.0f;
-		//ImGui::ProgressBar(vol_l + 0.5, ImVec2(200, 16), 0); ImGui::SameLine();
-		//ImGui::ProgressBar(vol_r + 0.5, ImVec2(200, 16), 0);
+		float vol_l = ((signed short)(top->AUDIO_L) / 256.0f) / 256.0f;
+		float vol_r = ((signed short)(top->AUDIO_R) / 256.0f) / 256.0f;
+		ImGui::ProgressBar(vol_l + 0.5, ImVec2(200, 16), 0); ImGui::SameLine();
+		ImGui::ProgressBar(vol_r + 0.5, ImVec2(200, 16), 0);
 #endif
 
 		// Draw VGA output
@@ -553,8 +551,9 @@ int main(int argc, char** argv, char** env)
 			}
 		}
 
-		top->IN0 = 255 ^ ((input.inputs[input_start_1]) << 7);
-		top->IN1 = 0b11111111;
+		//top->IN0 = input.inputs[input_start_1] ? 0 : 255;
+		//top->IN1 = input.inputs[input_start_1] ? 0 : 255;
+		/*top->IN1 = 0b11111111;*/
 		top->IN2 = 255;
 
 		// Run simulation

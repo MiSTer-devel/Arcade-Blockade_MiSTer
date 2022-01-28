@@ -233,6 +233,7 @@ wire [31:0] status;
 wire  [1:0] buttons;
 wire        forced_scandoubler;
 wire        direct_video;
+wire [21:0] gamma_bus;
 
 wire        ioctl_download;
 wire        ioctl_upload;
@@ -244,10 +245,6 @@ wire  [7:0] ioctl_index;
 wire        ioctl_wait;
 
 wire [15:0] joystick_0, joystick_1;
-wire [15:0] joy = joystick_0 | joystick_1;
-
-wire [21:0] gamma_bus;
-
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -277,23 +274,25 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 );
 
 ///////////////////   CONTROLS   ////////////////////
-wire m_up     = joy[3];
-wire m_down   = joy[2];
-wire m_left   = joy[1];
-wire m_right  = joy[0];
-wire m_coin  = joy[4];
+wire p1_right = joystick_0[0];
+wire p1_left = joystick_0[1];
+wire p1_down = joystick_0[2];
+wire p1_up = joystick_0[3];
+wire p2_right = joystick_1[0];
+wire p2_left = joystick_1[1];
+wire p2_down = joystick_1[2];
+wire p2_up = joystick_1[3];
+wire btn_coin = joystick_0[4] || joystick_1[4];
 
 ///////////////////   INPUTS   ////////////////////
-wire [7:0] IN0 = 8'hFF;
-wire [7:0] IN1 = 8'hFF;
-wire [7:0] IN2 = 8'hFF;
-
+wire [7:0] IN0 = 8'hFF; // IN0 is unused in Blockade
+wire [7:0] IN1 = ~{btn_coin, 7'b0};
+wire [7:0] IN2 = ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up};
 
 ///////////////////   VIDEO   ////////////////////
 reg ce_pix;
 wire hblank, vblank, hs, vs, hs_original, vs_original;
 wire r, g, b;
-
 wire [23:0] rgb = {{8{r}},{8{g}},{8{b}}};
 
 arcade_video #(256,24) arcade_video

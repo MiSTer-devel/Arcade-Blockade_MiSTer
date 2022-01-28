@@ -5,7 +5,7 @@ module emu(
 
    input clk_sys /*verilator public_flat*/,
    input reset/*verilator public_flat*/,
-   input [11:0]  inputs/*verilator public_flat*/,
+   input [8:0]  inputs/*verilator public_flat*/,
 
    input [7:0] IN0,
    input [7:0] IN1,
@@ -42,14 +42,16 @@ module emu(
    assign VGA_G = {8{GREEN}};
    assign VGA_B = {8{BLUE}};
 
-   wire btn_start = inputs[6];
+   // Inputs
+   wire p1_right = inputs[0];
+   wire p1_left = inputs[1];
+   wire p1_down = inputs[2];
+   wire p1_up = inputs[3];
+   wire p2_right = inputs[4];
+   wire p2_left = inputs[5];
+   wire p2_down = inputs[6];
+   wire p2_up = inputs[7];
    wire btn_coin = inputs[8];
-   wire m_bomb = inputs[5];
-   wire m_fire = inputs[4];
-   wire m_right = inputs[0];
-   wire m_left = inputs[1];
-   wire m_down = inputs[2];
-   wire m_up = inputs[3];
 
    blockade blockade (
       .clk(clk_sys),
@@ -60,8 +62,8 @@ module emu(
       .b(BLUE),
       //.buttons(~{btn_coin, btn_start, m_bomb, m_fire, m_right, m_left, m_down, m_up}),
       .in0(IN0),
-      .in1(IN1),
-      .in2(IN2),
+      .in1(~{btn_coin, 7'b0}), // Coin + DIPS?
+      .in2(~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}), // Controls
       .hsync(VGA_HS),
       .vsync(VGA_VS),
       .hblank(VGA_HB),

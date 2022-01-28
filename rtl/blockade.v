@@ -41,13 +41,12 @@ assign ce_pix = (vid_count == 2'd3);
 wire PHI_1 = phi_count[3:1] == 3'b000;
 wire PHI_2 = phi_count >= 4'd3 && phi_count <= 4'd8;
 
-// U9 D flip-flop
-reg u9_q;
-reg PHI_2_last;
-
 // U21 - Video RAM address select
 wire a12_n_a15 = ADDR[15] && ~ADDR[12];
 
+// U9 D flip-flop - Disables CPU using READY signal when attempting to write VRAM during vblank
+reg u9_q;
+reg PHI_2_last;
 always @(posedge clk) begin
 	if(reset)
 	begin
@@ -55,6 +54,7 @@ always @(posedge clk) begin
 	end
 	else
 	begin
+		PHI_2_last <= PHI_2;
 		if(PHI_2 && !PHI_2_last)
 		begin
 			if(VBLANK_N && a12_n_a15)
@@ -67,29 +67,30 @@ end
 
 // Address decode
 wire rom_cs = (!ADDR[15] && !ADDR[11] && !ADDR[10]);
-wire ram_cs = ADDR[15] && !ADDR[12];
+wire vram_cs = ADDR[15] && !ADDR[12];
 wire sram_cs = ADDR[15] && ADDR[12];
 
-wire ram_we = ram_cs && !WR_N;
+// VRAM and static RAM write enables
+wire vram_we = vram_cs && !WR_N;
 wire sram_we = sram_cs && !WR_N;
 
-wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? in0 : // IN0
+// Input data selector
+wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? in0 : // IN0 - Not connected in Blockade
 							(ADDR[1:0] == 2'd1) ? in1 : // IN1
 							(ADDR[1:0] == 2'd2) ? in2 : // IN2
 							8'h00;
 
-// CPU
+// CPU data selector
 wire [7:0] cpu_data_in = INP ? inp_data_out :
 						 rom_cs ? rom_data_out :
-						 ram_cs ? ram_data_out :
+						 vram_cs ? vram_data_out_cpu :
 						 sram_cs ? sram_data_out :
 						 8'h00;
-
-reg [7:0] cpu_data_out;
 
 wire [15:0] ADDR;
 wire [7:0] DATA;
 wire DBIN;
+reg [7:0] cpu_data_out;
 wire WR_N;
 wire SYNC /*verilator public_flat*/;
 wire HLD_A;
@@ -127,10 +128,11 @@ localparam HBLANK_START = 9'd255;
 localparam HSYNC_START = 9'd272;
 localparam HSYNC_END = 9'd300;
 localparam HRESET_LINE = 9'd329;
+localparam VSYNC_START = 9'd256;
+localparam VSYNC_END = 9'd258;
 localparam VBLANK_START = 9'd224;
-localparam VSYNC_START = 9'd254;
-localparam VRESET_LINE = 9'd261;
 localparam VBLANK_END = 9'd261;
+localparam VRESET_LINE = 9'd261;
 
 // Counters
 reg [8:0] hcnt;
@@ -155,12 +157,11 @@ wire s_128V = vcnt[7];
 wire s_256V = vcnt[8];
 
 // Signals
-reg HBLANK_N_last = 1'b1;
 reg HBLANK_N = 1'b1;
-reg HSYNC_N_last = 1'b1;
 reg HSYNC_N = 1'b1;
+reg HSYNC_N_last = 1'b1;
 wire VBLANK_N = ~(vcnt >= VBLANK_START);
-wire VSYNC_N = ~(vcnt >= VSYNC_START);
+wire VSYNC_N = ~(vcnt >= VSYNC_START && vcnt <= VSYNC_END);
 
 // Video read addresses
 reg [2:0] prom_col;
@@ -285,8 +286,8 @@ dpram #(10,4, "316-0004.u2.hex") rom_msb
 	.q_b()
 );
 
-// U38, U39, U40, U41, U42 - 2102 - Video RAM
-wire [7:0] ram_data_out;
+// U38, U39, U40, U41, U42 - 2102 - Video RAM (dual-ported for simplicity)
+wire [7:0] vram_data_out_cpu;
 wire [7:0] vram_data_out;
 dpram #(10,8) ram
 (
@@ -298,21 +299,19 @@ dpram #(10,8) ram
 
 	.clock_b(clk),
 	.address_b(ADDR[9:0]),
-	.wren_b(ram_we),
+	.wren_b(vram_we),
 	.data_b(cpu_data_out),
-	.q_b(ram_data_out)
+	.q_b(vram_data_out_cpu)
 );
 
 // U6, U7 - 2111 - Static RAM
 wire [7:0]	sram_data_out;
-wire [7:0]	sram_data_in = cpu_data_out;
-wire [7:0]  sram_addr = ADDR[7:0];
 spram #(8,8) sram
 (
 	.clk(clk),
-	.address(sram_addr),
+	.address(ADDR[7:0]),
 	.wren(sram_we),
-	.data(sram_data_in),
+	.data(cpu_data_out),
 	.q(sram_data_out)
 );
 
