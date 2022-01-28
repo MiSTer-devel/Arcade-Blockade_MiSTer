@@ -204,8 +204,10 @@ assign VIDEO_ARY = (!ar) ? 12'd5 : 12'd0;
 `include "build_id.v" 
 localparam CONF_STR = {
 	"A.BLOCKADE;;",
-	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",  
+	"O89,Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"OGJ,Analog Video H-Pos,0,-1,-2,-3,-4,-5,-6,-7,8,7,6,5,4,3,2,1;",
+	"OKN,Analog Video V-Pos,0,-1,-2,-3,-4,-5,-6,-7,8,7,6,5,4,3,2,1;",
 	"-;",
 	"R0,Reset;",
 	"J1,Coin;",
@@ -288,12 +290,12 @@ wire [7:0] IN2 = 8'hFF;
 
 
 ///////////////////   VIDEO   ////////////////////
-wire hblank, vblank;
-wire hs, vs;
 reg ce_pix;
-
+wire hblank, vblank, hs, vs, hs_original, vs_original;
 wire r, g, b;
+
 wire [23:0] rgb = {{8{r}},{8{g}},{8{b}}};
+
 arcade_video #(256,24) arcade_video
 (
 	.*,
@@ -304,6 +306,23 @@ arcade_video #(256,24) arcade_video
 	.HSync(hs),
 	.VSync(vs),
 	.fx(status[5:3])
+);
+
+// H/V offset
+wire [3:0]  voffset = status[23:20];
+wire [3:0]  hoffset = status[19:16];
+jtframe_resync jtframe_resync
+(
+	.clk(clk_sys),
+	.pxl_cen(ce_pix),
+	.hs_in(hs_original),
+	.vs_in(vs_original),
+	.LVBL(~vblank),
+	.LHBL(~hblank),
+	.hoffset(hoffset),
+	.voffset(voffset),
+	.hs_out(hs),
+	.vs_out(vs)
 );
 
 ///////////////////   GAME   ////////////////////
@@ -321,8 +340,8 @@ blockade blockade (
 	.in0(IN0),
 	.in1(IN1),
 	.in2(IN2),
-	.hsync(hs),
-	.vsync(vs),
+	.hsync(hs_original),
+	.vsync(vs_original),
 	.hblank(hblank),
 	.vblank(vblank),
 	.dn_addr(ioctl_addr[13:0]),
