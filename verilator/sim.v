@@ -7,10 +7,6 @@ module emu(
    input reset/*verilator public_flat*/,
    input [8:0]  inputs/*verilator public_flat*/,
 
-   input [7:0] IN0,
-   input [7:0] IN1,
-   input [7:0] IN2,
-
    output [7:0] VGA_R/*verilator public_flat*/,
    output [7:0] VGA_G/*verilator public_flat*/,
    output [7:0] VGA_B/*verilator public_flat*/,
@@ -52,6 +48,12 @@ module emu(
    wire p2_down = inputs[6];
    wire p2_up = inputs[7];
    wire btn_coin = inputs[8];
+   wire btn_boom = 1'b1;
+
+   localparam dip_lives_6 = 3'b000;
+   localparam dip_lives_5 = 3'b100;
+   localparam dip_lives_4 = 3'b110;
+   localparam dip_lives_3 = 3'b011;
 
    blockade blockade (
       .clk(clk_sys),
@@ -60,9 +62,8 @@ module emu(
       .r(RED),
       .g(GREEN),
       .b(BLUE),
-      //.buttons(~{btn_coin, btn_start, m_bomb, m_fire, m_right, m_left, m_down, m_up}),
-      .in0(IN0),
-      .in1(~{btn_coin, 7'b0}), // Coin + DIPS?
+      .in0(~{8'b00000000}),
+      .in1(~{btn_coin, dip_lives_5, 1'b0, btn_boom, 2'b00}), // Coin + DIPS?
       .in2(~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}), // Controls
       .hsync(VGA_HS),
       .vsync(VGA_VS),

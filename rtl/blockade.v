@@ -8,9 +8,6 @@ module blockade (
 	output r,
 	output g,
 	output b,
-	// output reg r,
-	// output reg g,
-	// output reg b,
 	output vsync,
 	output hsync,
 	output vblank,
@@ -90,10 +87,8 @@ wire [7:0] cpu_data_in = INP ? inp_data_out :
 wire [15:0] ADDR;
 wire [7:0] DATA;
 wire DBIN;
-reg [7:0] cpu_data_out;
 wire WR_N;
 wire SYNC /*verilator public_flat*/;
-wire HLD_A;
 vm80a cpu
 (
 	.pin_clk(clk),
@@ -113,6 +108,7 @@ vm80a cpu
 	.pin_wr_n(WR_N)
 );
 assign DATA = DBIN ? cpu_data_in: 8'hZZ;
+reg [7:0] cpu_data_out;
 always @(posedge clk) begin
 	if(!WR_N)
 	begin
@@ -249,6 +245,12 @@ ttl_7442 u1
 	.o(u1_q)
 );
 
+always @(posedge clk) begin
+	if(OUTP)
+	begin
+		$display("OUTP: %d", ADDR[3:0]);
+	end
+end
 
 // MEMORY
 // ------

@@ -5,8 +5,10 @@
 	<mameversion>0225</mameversion>
 	<rbf>Blockade</rbf>
 
-	<buttons default="A,B,Start,Select" names="Fast,Pause,Start,Test"></buttons>
-	<switches></switches>
+	<buttons default="Start" names="Start"></buttons>
+	<switches default="00">
+		<dip bits="0,1" ids="3,4,5,6" name="Lives" values="0,1,2,3"></dip>
+	</switches>
 
 	<rom index="1"></rom>
 	<rom index="0" md5="none" zip="blockade.zip">
@@ -18,4 +20,4 @@
 
 	<nvram></nvram>
 
-</misterromdescription>	
+</misterromdescription>

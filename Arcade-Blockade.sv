@@ -209,12 +209,13 @@ localparam CONF_STR = {
 	"OGJ,Analog Video H-Pos,0,-1,-2,-3,-4,-5,-6,-7,8,7,6,5,4,3,2,1;",
 	"OKN,Analog Video V-Pos,0,-1,-2,-3,-4,-5,-6,-7,8,7,6,5,4,3,2,1;",
 	"-;",
+	"DIP;",
+	"-;",
 	"R0,Reset;",
 	"J1,Coin;",
 	"Jn,Start;",
 	"V,v",`BUILD_DATE
 };
-
 
 ////////////////////   CLOCKS   ///////////////////
 
@@ -273,6 +274,16 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.joystick_1(joystick_1)
 );
 
+///////////////////   DIPS   ////////////////////
+reg [7:0] sw[8];
+always @(posedge clk_sys) if (ioctl_wr && (ioctl_index==254) && !ioctl_addr[24:3]) sw[ioctl_addr[2:0]] <= ioctl_dout;
+
+// DIPs are strange in this game, so they are remapped here
+wire [2:0] dip_lives =  sw[0][1:0] == 2'd0 ?  3'b011 : // 3 lives
+						sw[0][1:0] == 2'd1 ?  3'b110 : // 4 lives
+						sw[0][1:0] == 2'd2 ?  3'b100 : // 5 lives
+											  3'b000;   // 6 lives
+
 ///////////////////   CONTROLS   ////////////////////
 wire p1_right = joystick_0[0];
 wire p1_left = joystick_0[1];
@@ -283,10 +294,11 @@ wire p2_left = joystick_1[1];
 wire p2_down = joystick_1[2];
 wire p2_up = joystick_1[3];
 wire btn_coin = joystick_0[4] || joystick_1[4];
+wire btn_boom = 1'b0;
 
 ///////////////////   INPUTS   ////////////////////
 wire [7:0] IN0 = 8'hFF; // IN0 is unused in Blockade
-wire [7:0] IN1 = ~{btn_coin, 7'b0};
+wire [7:0] IN1 = ~{btn_coin, dip_lives, 1'b0, btn_boom, 2'b00 };
 wire [7:0] IN2 = ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up};
 
 ///////////////////   VIDEO   ////////////////////

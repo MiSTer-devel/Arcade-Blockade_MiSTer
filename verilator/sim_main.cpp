@@ -551,11 +551,6 @@ int main(int argc, char** argv, char** env)
 			}
 		}
 
-		//top->IN0 = input.inputs[input_start_1] ? 0 : 255;
-		//top->IN1 = input.inputs[input_start_1] ? 0 : 255;
-		/*top->IN1 = 0b11111111;*/
-		top->IN2 = 255;
-
 		// Run simulation
 		if (run_enable)
 		{
