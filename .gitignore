@@ -43,3 +43,4 @@ verilator/x64/*
 verilator/roms/*
 verilator/imgui.ini
 *.vcd
+*.m4v

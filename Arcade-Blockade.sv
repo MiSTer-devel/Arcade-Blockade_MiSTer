@@ -278,7 +278,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 reg [7:0] sw[8];
 always @(posedge clk_sys) if (ioctl_wr && (ioctl_index==254) && !ioctl_addr[24:3]) sw[ioctl_addr[2:0]] <= ioctl_dout;
 
-// DIPs are strange in this game, so they are remapped here
+// DIPs behave strangely in Blockade, so they are remapped here
 wire [2:0] dip_lives =  sw[0][1:0] == 2'd0 ?  3'b011 : // 3 lives
 						sw[0][1:0] == 2'd1 ?  3'b110 : // 4 lives
 						sw[0][1:0] == 2'd2 ?  3'b100 : // 5 lives
