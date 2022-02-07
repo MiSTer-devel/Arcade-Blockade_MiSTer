@@ -16,6 +16,9 @@ module emu(
    output VGA_HB,
    output VGA_VB,
 
+   output [15:0] AUDIO_L,
+   output [15:0] AUDIO_R,
+
    input        ioctl_download,
    input        ioctl_upload,
    input        ioctl_wr,
@@ -38,6 +41,12 @@ module emu(
    assign VGA_G = {8{GREEN}};
    assign VGA_B = {8{BLUE}};
 
+   // Audio
+   wire [15:0] audio_l;
+   wire [15:0] audio_r;
+   assign AUDIO_L = audio_l;
+   assign AUDIO_R = audio_r;
+
    // Inputs
    wire p1_right = inputs[0];
    wire p1_left = inputs[1];
@@ -48,7 +57,7 @@ module emu(
    wire p2_down = inputs[6];
    wire p2_up = inputs[7];
    wire btn_coin = inputs[8];
-   wire btn_boom = 1'b1;
+   wire btn_boom = 1'b0;
 
    localparam dip_lives_6 = 3'b000;
    localparam dip_lives_5 = 3'b100;
@@ -63,7 +72,7 @@ module emu(
       .g(GREEN),
       .b(BLUE),
       .in0(~{8'b00000000}),
-      .in1(~{btn_coin, dip_lives_5, 1'b0, btn_boom, 2'b00}), // Coin + DIPS?
+      .in1(~{btn_coin, dip_lives_6, 1'b0, btn_boom, 2'b00}), // Coin + DIPS?
       .in2(~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}), // Controls
       .hsync(VGA_HS),
       .vsync(VGA_VS),
@@ -71,7 +80,9 @@ module emu(
       .vblank(VGA_VB),
       .dn_addr(ioctl_addr[13:0]),
       .dn_data(ioctl_dout),
-      .dn_wr(ioctl_wr)
+      .dn_wr(ioctl_wr),
+      .audio_l(audio_l),
+      .audio_r(audio_r)
    );
 
 endmodule

@@ -44,3 +44,4 @@ verilator/roms/*
 verilator/imgui.ini
 *.vcd
 *.m4v
+verilator/audio.wav

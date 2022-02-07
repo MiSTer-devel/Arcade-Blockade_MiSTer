@@ -584,11 +584,11 @@ void SimInput::Read() {
 		if (m_keyboardState_last[k] != m_keyboardState[k]) {
 			unsigned int ext = ev2ps2[k] & EXT;
 			//fprintf(stderr, "ev2ps2[k] = %x  ext = %x  temp = %x\n", ev2ps2[k], ext, EXT | 0x6b);
-			SimInput_PS2KeyEvent evt = SimInput_PS2KeyEvent(k, m_keyboardState[k], ext);
+			SimInput_PS2KeyEvent evt = SimInput_PS2KeyEvent(k, m_keyboardState[k], ext, ev2ps2[k]);
 			keyEvents.push(evt);
 		}
 		m_keyboardState_last[k] = m_keyboardState[k];
-}
+	}
 #else
 	for (int k = 0; k < m_keyboardStateCount; k++) {
 		if (m_keyboardState_last[k] != m_keyboardState[k]) {
@@ -608,7 +608,7 @@ void SimInput::SetMapping(int index, int code) {
 		mappings[index] = code;
 	else
 		mappings[index] = 0;
-		}
+}
 
 void SimInput::CleanUp() {
 
@@ -631,21 +631,15 @@ void SimInput::BeforeEval()
 		if (keyEvents.size() > 0) {
 			// Get chunk from queue
 			SimInput_PS2KeyEvent evt = keyEvents.front();
-			//fprintf(stderr, "evt = %x  ext = %d \n", evt.code, evt.extended);
 			keyEvents.pop();
-
-			ps2_key_temp = ev2ps2[evt.code];
-
+			ps2_key_temp = evt.mapped;
 			if (evt.extended) { ps2_key_temp |= (1UL << 8); }
 			if (evt.pressed) { ps2_key_temp |= (1UL << 9); }
 			if (ps2_clock) { ps2_key_temp |= (1UL << 10); }
-
 			ps2_clock = !ps2_clock;
-
 			if (ps2_key != NULL) {
 				*ps2_key = ps2_key_temp;
 			}
-
 			keyEventTimer = keyEventWait;
 		}
 	}

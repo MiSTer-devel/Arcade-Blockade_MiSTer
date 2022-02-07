@@ -13,6 +13,9 @@ module blockade (
 	output vblank,
 	output hblank,
 
+	output signed [15:0] audio_l,
+	output signed [15:0] audio_r,
+
 	input [7:0] in0,
 	input [7:0] in1,
 	input [7:0] in2,
@@ -210,12 +213,15 @@ assign vsync = ~VSYNC_N;
 // U45 AND - Enable for U51 latch
 wire u45 = PHI_1 && SYNC;
 
+reg [31:0] timer;
+
 // U51 latch
 reg l_D7;
 reg l_D6;
 reg l_D4;
 reg l_D3;
 always @(posedge clk) begin
+	timer <= timer + 32'b1;
 	if(u45)
 	begin
 		l_D7 <= DATA[7];
@@ -245,12 +251,124 @@ ttl_7442 u1
 	.o(u1_q)
 );
 
-always @(posedge clk) begin
-	if(OUTP)
+
+// AUDIO
+wire u68_out;
+ttl_555 #(
+//	.HIGH_COUNTS(107),
+	//.LOW_COUNTS(39)
+	// .HIGH_COUNTS(106615),
+	// .LOW_COUNTS(38900)
+	.HIGH_COUNTS(162),
+	.LOW_COUNTS(59)
+) u68 (
+	.clk(clk),
+	.reset(reset),
+	.out(u68_out)
+);
+
+wire [3:0] u67_q;
+reg [3:0] u67_p;
+wire u67_tco;
+wire [3:0] u66_q;
+reg [3:0] u66_p;
+wire u66_tco;
+reg u68_out_last;
+always @(posedge clk)
+begin
+	u68_out_last <= u68_out;
+end
+
+ttl_74163 u67 
+(
+	.clk(clk),
+	.ce(u68_out && !u68_out_last),
+	.enp(1'b1),
+	.ent(1'b1),
+	.reset_n(~reset),
+	.load_n(u60_1_ce),
+	.p(u67_p),
+	.q(u67_q),
+	.tco(u67_tco)
+);
+
+ttl_74163 u66 
+(
+	.clk(clk),
+	.ce(u68_out && !u68_out_last),
+	.enp(u67_tco),
+	.ent(1'b1),
+	.reset_n(~reset),
+	.load_n(u60_1_ce),
+	.p(u66_p),
+	.q(u66_q),
+	.tco(u66_tco)
+);
+
+wire u60_1_ce = ~u66_tco;
+reg u60_1_q;
+
+// U60_1 flip flop
+always @(posedge clk)
+begin
+	if(reset)
+		u60_1_q <= 1'b0;
+	else
+		if(u60_1_ce) u60_1_q <= 1'b1;
+end
+
+// U60_2 flip flop
+reg u60_2_q;
+reg u66_tco_last;
+always @(posedge clk)
+begin
+	u66_tco_last <= u66_tco;
+	if(~u60_1_q)
 	begin
-		$display("OUTP: %d", ADDR[3:0]);
+		u60_2_q <= 1'b0;
+	end
+	else
+	begin
+		if(u66_tco && !u66_tco_last)
+		begin
+			u60_2_q <= ~u60_2_q;
+		end
 	end
 end
+
+reg [31:0] timer_last_outp2;
+reg OUTP_last;
+always @(posedge clk) begin
+	OUTP_last <= OUTP;
+	if(OUTP && !OUTP_last)
+	begin
+
+		if(ADDR[1])
+		begin
+			// OUTP2 - Movement sound latch
+			$display("(%d) Latching OUTP 2 %b %b >> %b %b  (%d)", timer, u66_p, u67_p, cpu_data_out[7:4], cpu_data_out[3:0], timer - timer_last_outp2);
+			u66_p <= DATA[7:4];
+			u67_p <= DATA[3:0];
+
+			timer_last_outp2 <= timer;
+		end
+		else if(ADDR[3])
+		begin
+			// OUTP8 - ?
+			//$display("OUTP 8: %b", cpu_data_out);
+		end
+		else
+		begin
+			$display("OUTP: %b %b", ADDR[3:0], cpu_data_out);
+		end
+	end
+end
+
+//assign audio_l = { 2'b0, u66_q, 10'b0 };
+// assign audio_r = { 2'b0, u66_q, 10'b0 };
+assign audio_l = !u60_2_q ? -20000 : 20000;
+assign audio_r = !u68_out ? -12000 : 12000;
+
 
 // MEMORY
 // ------

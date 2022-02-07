@@ -2,6 +2,7 @@
 #include "Vemu.h"
 
 #include "imgui.h"
+#include "implot.h"
 #ifndef _MSC_VER
 #include <stdio.h>
 #include <SDL.h>
@@ -14,6 +15,7 @@
 #include "sim_console.h"
 #include "sim_bus.h"
 #include "sim_video.h"
+#include "sim_audio.h"
 #include "sim_input.h"
 #include "sim_clock.h"
 
@@ -34,7 +36,7 @@ using namespace std;
 // ------------------
 int initialReset = 48;
 bool run_enable = 1;
-int batchSize = 25000000 / 100;
+int batchSize = 25000000 / 100000;
 bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
@@ -45,6 +47,7 @@ const char* windowTitle = "Verilator Sim: Sega/Gremlin - Blockade";
 const char* windowTitle_Control = "Simulation control";
 const char* windowTitle_DebugLog = "Debug log";
 const char* windowTitle_Video = "VGA output";
+const char* windowTitle_Audio = "Audio output";
 bool showDebugLog = true;
 DebugConsole console;
 MemoryEditor mem_edit;
@@ -88,8 +91,8 @@ double sc_time_stamp()
 	return main_time;
 }
 
-int clockSpeed = 8;	 // This is not used, just a reminder for the dividers below
-SimClock clk_sys(1); // 4mhz
+int clk_sys_freq = 20000000;
+SimClock clk_sys(1);
 
 void resetSim()
 {
@@ -100,15 +103,15 @@ void resetSim()
 
 
 // Audio
-//#define DEBUG_AUDIO
-#ifdef DEBUG_AUDIO
-SimClock clk_audio(2205);
-ofstream audioFile;
+// -----
+//#define DISABLE_AUDIO
+#ifndef DISABLE_AUDIO
+SimAudio audio(clk_sys_freq, true);
 #endif
 
 
 // MAME debug log
-//#define CPU_DEBUG
+#define CPU_DEBUG
 
 #ifdef CPU_DEBUG
 bool log_instructions = false;
@@ -142,7 +145,9 @@ bool writeLog(const char* line)
 		std::string m_line = log_mame.at(log_index);
 		//std::string f = fmt::format("{0}: hcnt={1} vcnt={2} {3} {4}", log_index, top->top__DOT__missile__DOT__sc__DOT__hcnt, top->top__DOT__missile__DOT__sc__DOT__vcnt, m, c);
 		//console.AddLog(f.c_str());
-		if (log_instructions) { console.AddLog(c.c_str(), ins_count); }
+		if (log_instructions) { 
+			console.AddLog(c.c_str(), ins_count); 
+		}
 
 		if (stop_on_log_mismatch && m_line != c_line) {
 			console.AddLog("DIFF at %d", log_index);
@@ -259,9 +264,6 @@ int verilate()
 		// Set system clock in core
 		top->clk_sys = clk_sys.clk;
 
-		//// Update console with current cycle for logging
-		//console.prefix = "(" + std::to_string(main_time) + ") ";
-
 		// Simulate both edges of system clock
 		if (clk_sys.clk != clk_sys.old) {
 			if (clk_sys.clk) {
@@ -347,12 +349,10 @@ int verilate()
 
 		}
 
-#ifdef DEBUG_AUDIO
-		clk_audio.Tick();
-		if (clk_audio.IsRising()) {
-			// Output audio
-			unsigned short audio_l = top->AUDIO_L;
-			audioFile.write((const char*)&audio_l, 2);
+#ifndef DISABLE_AUDIO
+		if (clk_sys.IsRising())
+		{
+			audio.Clock(top->AUDIO_L, top->AUDIO_R);
 		}
 #endif
 
@@ -362,9 +362,12 @@ int verilate()
 			video.Clock(top->VGA_HB, top->VGA_VB, top->VGA_HS, top->VGA_VS, colour);
 		}
 
-		main_time++;
+		if (clk_sys.IsRising()) {
+			main_time++;
+		}
 		return 1;
 	}
+
 	// Stop verilating and cleanup
 	top->final();
 	delete top;
@@ -400,10 +403,15 @@ int main(int argc, char** argv, char** env)
 	bus.ioctl_index = &top->ioctl_index;
 	bus.ioctl_wait = &top->ioctl_wait;
 	bus.ioctl_download = &top->ioctl_download;
-	bus.ioctl_upload = &top->ioctl_upload;
+	//bus.ioctl_upload = &top->ioctl_upload;
 	bus.ioctl_wr = &top->ioctl_wr;
 	bus.ioctl_dout = &top->ioctl_dout;
-	bus.ioctl_din = &top->ioctl_din;
+	//bus.ioctl_din = &top->ioctl_din;
+	//input.ps2_key = &top->ps2_key;
+
+#ifndef DISABLE_AUDIO
+	audio.Initialise();
+#endif
 
 	// Set up input module
 	input.Initialise();
@@ -422,22 +430,16 @@ int main(int argc, char** argv, char** env)
 	input.SetMapping(input_right, SDL_SCANCODE_RIGHT);
 	input.SetMapping(input_down, SDL_SCANCODE_DOWN);
 	input.SetMapping(input_left, SDL_SCANCODE_LEFT);
+	input.SetMapping(input_fire1, SDL_SCANCODE_SPACE);
+	input.SetMapping(input_start_1, SDL_SCANCODE_1);
+	input.SetMapping(input_start_2, SDL_SCANCODE_2);
 	input.SetMapping(input_coin_1, SDL_SCANCODE_3);
+	input.SetMapping(input_coin_2, SDL_SCANCODE_4);
+	input.SetMapping(input_coin_3, SDL_SCANCODE_5);
+	input.SetMapping(input_pause, SDL_SCANCODE_P);
 #endif
 	// Setup video output
-	if (video.Initialise(windowTitle) == 1)
-	{
-		return 1;
-	}
-
-	// Reset simulation
-	resetSim();
-
-	// Stage roms for this core
-	/*bus.QueueDownload("roms/blockade/316-0001.u43", 0);
-	bus.QueueDownload("roms/blockade/316-0002.u29", 0);
-	bus.QueueDownload("roms/blockade/316-0003.u3", 0);
-	bus.QueueDownload("roms/blockade/316-0004.u2", 0);*/
+	if (video.Initialise(windowTitle) == 1) { return 1; }
 
 #ifdef WIN32
 	MSG msg;
@@ -465,6 +467,7 @@ int main(int argc, char** argv, char** env)
 		video.StartFrame();
 
 		input.Read();
+
 
 		// Draw GUI
 		// --------
@@ -499,47 +502,115 @@ int main(int argc, char** argv, char** env)
 		// Debug log window
 		console.Draw(windowTitle_DebugLog, &showDebugLog, ImVec2(500, 700));
 		ImGui::SetWindowPos(windowTitle_DebugLog, ImVec2(0, 160), ImGuiCond_Once);
+
+		// Memory debug
+		//ImGui::Begin("PGROM Editor");
+		//mem_edit.DrawContents(top->emu__DOT__system__DOT__pgrom__DOT__mem, 32768, 0);
+		//ImGui::End();
+		//ImGui::Begin("CHROM Editor");
+		//mem_edit.DrawContents(top->emu__DOT__system__DOT__chrom__DOT__mem, 2048, 0);
+		//ImGui::End();
+		//ImGui::Begin("WKRAM Editor");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__wkram__DOT__mem, 16384, 0);
+		//ImGui::End();
+		//ImGui::Begin("CHRAM Editor");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__chram__DOT__mem, 2048, 0);
+		//ImGui::End();
+		//ImGui::Begin("FGCOLRAM Editor");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__fgcolram__DOT__mem, 2048, 0);
+		//ImGui::End();
+		//ImGui::Begin("BGCOLRAM Editor");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__bgcolram__DOT__mem, 2048, 0);
+		//ImGui::End();
+		//ImGui::Begin("Sprite RAM");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spriteram__DOT__mem, 96, 0);
+		//ImGui::End();
+		//ImGui::Begin("Sprite Linebuffer RAM");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spritelbram__DOT__mem, 1024, 0);
+		//ImGui::End();
+		//ImGui::Begin("Sprite Collision Buffer RAM A");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__comet__DOT__spritecollisionbufferram_a__DOT__mem, 512, 0);
+		//ImGui::End();
+		//ImGui::Begin("Sprite Collision Buffer RAM B");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__comet__DOT__spritecollisionbufferram_b__DOT__mem, 512, 0);
+		//ImGui::End();
+		//ImGui::Begin("Sprite Collision RAM ");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spritecollisionram__DOT__mem, 32, 0);
+		//ImGui::End();
+		//ImGui::Begin("Sprite Debug RAM");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spritedebugram__DOT__mem, 128000, 0);
+		//ImGui::End();
+		//ImGui::Begin("Palette ROM");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__palrom__DOT__mem, 64, 0);
+		//ImGui::End();
+		//ImGui::Begin("Sprite ROM");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spriterom__DOT__mem, 2048, 0);
+		//ImGui::End();
+		//ImGui::Begin("Tilemap ROM");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__tilemaprom__DOT__mem, 8192, 0);
+		//ImGui::End();
+		//ImGui::Begin("Tilemap RAM");
+		//	mem_edit.DrawContents(&top->emu__DOT__system__DOT__tilemapram__DOT__mem, 768, 0);
+		//ImGui::End();
+		//ImGui::Begin("Sound ROM");
+		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__soundrom__DOT__mem, 64000, 0);
+		//ImGui::End();
+		int windowX = 550;
+		int windowWidth = (VGA_WIDTH * VGA_SCALE_X) + 24;
+		int windowHeight = (VGA_HEIGHT * VGA_SCALE_Y) + 90;
+
 		// Video window
 		ImGui::Begin(windowTitle_Video);
-		ImGui::SetWindowPos(windowTitle_Video, ImVec2(550, 0), ImGuiCond_Once);
-		ImGui::SetWindowSize(windowTitle_Video, ImVec2((VGA_WIDTH * VGA_SCALE_X) + 28, (VGA_HEIGHT * VGA_SCALE_Y) + 132), ImGuiCond_Once);
+		ImGui::SetWindowPos(windowTitle_Video, ImVec2(windowX, 0), ImGuiCond_Once);
+		ImGui::SetWindowSize(windowTitle_Video, ImVec2(windowWidth, windowHeight), ImGuiCond_Once);
 
-		ImGui::SliderFloat("Zoom", &vga_scale, 1, 8);
+		ImGui::SliderFloat("Zoom", &vga_scale, 1, 8); ImGui::SameLine();
 		ImGui::SliderInt("Rotate", &video.output_rotate, -1, 1); ImGui::SameLine();
 		ImGui::Checkbox("Flip V", &video.output_vflip);
 		ImGui::Text("main_time: %d frame_count: %d sim FPS: %f", main_time, video.count_frame, video.stats_fps);
-
-#ifdef DEBUG_AUDIO
-		float vol_l = ((signed short)(top->AUDIO_L) / 256.0f) / 256.0f;
-		float vol_r = ((signed short)(top->AUDIO_R) / 256.0f) / 256.0f;
-		ImGui::ProgressBar(vol_l + 0.5, ImVec2(200, 16), 0); ImGui::SameLine();
-		ImGui::ProgressBar(vol_r + 0.5, ImVec2(200, 16), 0);
-#endif
 
 		// Draw VGA output
 		ImGui::Image(video.texture_id, ImVec2(video.output_width * VGA_SCALE_X, video.output_height * VGA_SCALE_Y));
 		ImGui::End();
 
-		//ImGui::Begin("rom_lsb");
-		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 1024, 0);
-		//ImGui::End();
-		//ImGui::Begin("rom_msb");
-		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 1024, 0);
-		//ImGui::End();
-		//ImGui::Begin("ram");
-		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__ram__DOT__mem, 1024, 0);
-		//ImGui::End();
-		//ImGui::Begin("sram");
-		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__sram__DOT__mem, 256, 0);
-		//ImGui::End();
-		//ImGui::Begin("prom_lsb");
-		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 512, 0);
-		//ImGui::End();
-		//ImGui::Begin("prom_msb");
-		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 512, 0);
-		//ImGui::End();
+
+#ifndef DISABLE_AUDIO
+
+		ImGui::Begin(windowTitle_Audio);
+		ImGui::SetWindowPos(windowTitle_Audio, ImVec2(windowX, windowHeight), ImGuiCond_Once);
+		ImGui::SetWindowSize(windowTitle_Audio, ImVec2(windowWidth, 250), ImGuiCond_Once);
+
+		
+		//float vol_l = ((signed short)(top->AUDIO_L) / 256.0f) / 256.0f;
+		//float vol_r = ((signed short)(top->AUDIO_R) / 256.0f) / 256.0f;
+		//ImGui::ProgressBar(vol_l + 0.5f, ImVec2(200, 16), 0); ImGui::SameLine();
+		//ImGui::ProgressBar(vol_r + 0.5f, ImVec2(200, 16), 0);
+
+		int ticksPerSec = (24000000 / 60);
+		if (run_enable) {
+			audio.CollectDebug((signed short)top->AUDIO_L, (signed short)top->AUDIO_R);
+		}
+		int channelWidth = (windowWidth / 2)  -16;
+		ImPlot::CreateContext();
+		if (ImPlot::BeginPlot("Audio - L", ImVec2(channelWidth, 220), ImPlotFlags_NoLegend | ImPlotFlags_NoMenus | ImPlotFlags_NoTitle)) {
+			ImPlot::SetupAxes("T", "A", ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickMarks, ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickMarks);
+			ImPlot::SetupAxesLimits(0, 1, -1, 1, ImPlotCond_Once);
+			ImPlot::PlotStairs("", audio.debug_positions, audio.debug_wave_l, audio.debug_max_samples, audio.debug_pos);
+			ImPlot::EndPlot();
+		}
+		ImGui::SameLine();
+		if (ImPlot::BeginPlot("Audio - R", ImVec2(channelWidth, 220), ImPlotFlags_NoLegend | ImPlotFlags_NoMenus | ImPlotFlags_NoTitle)) {
+			ImPlot::SetupAxes("T", "A", ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickMarks, ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_NoLabel | ImPlotAxisFlags_NoTickMarks);
+			ImPlot::SetupAxesLimits(0, 1, -1, 1, ImPlotCond_Once);
+			ImPlot::PlotStairs("", audio.debug_positions, audio.debug_wave_r, audio.debug_max_samples, audio.debug_pos);
+			ImPlot::EndPlot();
+		}
+		ImPlot::DestroyContext();
+		ImGui::End();
+#endif
 
 		video.UpdateTexture();
+
 
 		// Pass inputs to sim
 		top->inputs = 0;
@@ -552,25 +623,13 @@ int main(int argc, char** argv, char** env)
 		}
 
 		// Run simulation
-		if (run_enable)
-		{
-			for (int step = 0; step < batchSize; step++)
-			{
-				verilate();
-			}
+		if (run_enable) {
+			for (int step = 0; step < batchSize; step++) { verilate(); }
 		}
-		else
-		{
-			if (single_step)
-			{
-				verilate();
-			}
-			if (multi_step)
-			{
-				for (int step = 0; step < multi_step_amount; step++)
-				{
-					verilate();
-				}
+		else {
+			if (single_step) { verilate(); }
+			if (multi_step) {
+				for (int step = 0; step < multi_step_amount; step++) { verilate(); }
 			}
 		}
 	}
@@ -578,6 +637,7 @@ int main(int argc, char** argv, char** env)
 	// Clean up before exit
 	// --------------------
 
+	audio.CleanUp();
 	video.CleanUp();
 	input.CleanUp();
 
