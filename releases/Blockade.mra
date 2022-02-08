@@ -10,9 +10,18 @@
 		<dip bits="0,1" ids="3,4,5,6" name="Lives" values="0,1,2,3"></dip>
 	</switches>
 
-	<rom index="1"></rom>
+	<rom index="1">0</rom>
 	<rom index="0" md5="none" zip="blockade.zip">
-		<part crc="b77a50db" name="14479a.mpr"/>
+		<!-- GAME ROMS -->
+		<part crc="none" name="316-0003.u3"/>
+		<part crc="none" name="316-0004.u2"/>
+
+		<!-- PADDING -->
+		<part repeat="2048">00</part>
+
+		<!-- GFX PROMS -->
+		<part crc="none" name="316-0001.u43"/>
+		<part crc="none" name="316-0002.u29"/>
 	</rom>
 	<rom index="2"></rom>
 	<rom index="3"></rom>

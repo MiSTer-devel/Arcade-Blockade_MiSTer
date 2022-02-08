@@ -67,12 +67,6 @@ end
 
 // Address decode
 wire rom_cs = (!ADDR[15] && !ADDR[11] && !ADDR[10]);
-wire vram_cs = ADDR[15] && !ADDR[12];
-wire sram_cs = ADDR[15] && ADDR[12];
-
-// VRAM and static RAM write enables
-wire vram_we = vram_cs && !WR_N;
-wire sram_we = sram_cs && !WR_N;
 
 // Input data selector
 wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? in0 : // IN0 - Not connected in Blockade
@@ -135,25 +129,25 @@ localparam VRESET_LINE = 9'd261;
 
 // Counters
 reg [8:0] hcnt;
-wire s_1H = hcnt[0];
-wire s_2H = hcnt[1];
-wire s_4H = hcnt[2];
-wire s_8H = hcnt[3];
-wire s_16H = hcnt[4];
-wire s_32H = hcnt[5];
-wire s_64H = hcnt[6];
-wire s_128H = hcnt[7];
-wire s_256H = hcnt[8];
+//wire s_1H = hcnt[0];
+//wire s_2H = hcnt[1];
+//wire s_4H = hcnt[2];
+//wire s_8H = hcnt[3];
+//wire s_16H = hcnt[4];
+//wire s_32H = hcnt[5];
+//wire s_64H = hcnt[6];
+//wire s_128H = hcnt[7];
+//wire s_256H = hcnt[8];
 reg [8:0] vcnt;
 wire s_1V = vcnt[0];
 wire s_2V = vcnt[1];
 wire s_4V = vcnt[2];
-wire s_8V = vcnt[3];
-wire s_16V = vcnt[4];
-wire s_32V = vcnt[5];
-wire s_64V = vcnt[6];
-wire s_128V = vcnt[7];
-wire s_256V = vcnt[8];
+//wire s_8V = vcnt[3];
+//wire s_16V = vcnt[4];
+//wire s_32V = vcnt[5];
+//wire s_64V = vcnt[6];
+//wire s_128V = vcnt[7];
+//wire s_256V = vcnt[8];
 
 // Signals
 reg HBLANK_N = 1'b1;
@@ -241,71 +235,66 @@ wire INP = (l_D6 && DBIN);
 wire MEMR = (l_D7 && DBIN);
 
 // U1 - 7442 BCD to decimal decoder
-wire [9:0] u1_q;
-ttl_7442 u1
-(
-	.a(ADDR[10]),
-	.b(ADDR[11]),
-	.c(ADDR[15]),
-	.d(~MEMR),
-	.o(u1_q)
-);
+// wire [9:0] u1_q;
+// ttl_7442 u1
+// (
+// 	.a(ADDR[10]),
+// 	.b(ADDR[11]),
+// 	.c(ADDR[15]),
+// 	.d(~MEMR),
+// 	.o(u1_q)
+// );
 
 
 // AUDIO
 wire u68_out;
+reg u68_out_last;
 ttl_555 #(
-//	.HIGH_COUNTS(107),
-	//.LOW_COUNTS(39)
-	// .HIGH_COUNTS(106615),
-	// .LOW_COUNTS(38900)
-	.HIGH_COUNTS(162),
-	.LOW_COUNTS(59)
+	.HIGH_COUNTS(140),
+	.LOW_COUNTS(51)
 ) u68 (
 	.clk(clk),
 	.reset(reset),
 	.out(u68_out)
 );
 
-wire [3:0] u67_q;
-reg [3:0] u67_p;
-wire u67_tco;
-wire [3:0] u66_q;
-reg [3:0] u66_p;
-wire u66_tco;
-reg u68_out_last;
+reg [7:0] u6766_count;
+reg u6766_out;
+reg u6766_out_last;
+
 always @(posedge clk)
 begin
 	u68_out_last <= u68_out;
+	if(reset)
+	begin
+		u6766_count <= 8'b0;
+		u6766_out <= 1'b0;
+		u6766_out_last <= 1'b0;
+	end
+	else
+	begin
+		u6766_out_last <= u6766_out;
+		if(u68_out && !u68_out_last)
+		begin
+			if(u6766_out) // Load new inputs when counter overflows
+			begin
+				 // load parallel inputs
+				//$display("Loading u6766: %b", { u66_p, u67_p });
+				u6766_count <= u6766_p;
+				u6766_out <= 1'b0;
+			end
+			else
+			begin
+				// count up
+				u6766_count <= u6766_count + 8'b1;
+				u6766_out <= (u6766_count == 8'd255);
+			end
+		end
+	end
 end
 
-ttl_74163 u67 
-(
-	.clk(clk),
-	.ce(u68_out && !u68_out_last),
-	.enp(1'b1),
-	.ent(1'b1),
-	.reset_n(~reset),
-	.load_n(u60_1_ce),
-	.p(u67_p),
-	.q(u67_q),
-	.tco(u67_tco)
-);
-
-ttl_74163 u66 
-(
-	.clk(clk),
-	.ce(u68_out && !u68_out_last),
-	.enp(u67_tco),
-	.ent(1'b1),
-	.reset_n(~reset),
-	.load_n(u60_1_ce),
-	.p(u66_p),
-	.q(u66_q),
-	.tco(u66_tco)
-);
-
-wire u60_1_ce = ~u66_tco;
+reg [7:0] u6766_p;
+wire u60_1_ce = ~u6766_out;
 reg u60_1_q;
 
 // U60_1 flip flop
@@ -319,17 +308,15 @@ end
 
 // U60_2 flip flop
 reg u60_2_q;
-reg u66_tco_last;
 always @(posedge clk)
 begin
-	u66_tco_last <= u66_tco;
 	if(~u60_1_q)
 	begin
 		u60_2_q <= 1'b0;
 	end
 	else
 	begin
-		if(u66_tco && !u66_tco_last)
+		if(u6766_out && !u6766_out_last)
 		begin
 			u60_2_q <= ~u60_2_q;
 		end
@@ -338,46 +325,79 @@ end
 
 reg [31:0] timer_last_outp2;
 reg OUTP_last;
-always @(posedge clk) begin
-	OUTP_last <= OUTP;
-	if(OUTP && !OUTP_last)
-	begin
 
+wire u50_1 = ~(OUTP && ADDR[3]);
+wire u50_2 = ~(OUTP && ADDR[2]);
+/* verilator lint_off UNOPTFLAT */
+wire u50_3 = ~(u50_1 && u50_4);
+wire u50_4 = ~(u50_2 && u50_3);
+/* verilator lint_on UNOPTFLAT */
+
+always @(posedge clk) begin
+//	OUTP_last <= OUTP;
+//	if(OUTP && !OUTP_last)
+	if(OUTP)
+	begin
 		if(ADDR[1])
 		begin
 			// OUTP2 - Movement sound latch
-			$display("(%d) Latching OUTP 2 %b %b >> %b %b  (%d)", timer, u66_p, u67_p, cpu_data_out[7:4], cpu_data_out[3:0], timer - timer_last_outp2);
-			u66_p <= DATA[7:4];
-			u67_p <= DATA[3:0];
-
+			//$display("(%d) Latching OUTP 2 %b %b >> %b %b  (%d)", timer, u66_p, u67_p, cpu_data_out[7:4], cpu_data_out[3:0], timer - timer_last_outp2);
+			u6766_p <= DATA;
 			timer_last_outp2 <= timer;
 		end
-		else if(ADDR[3])
-		begin
-			// OUTP8 - ?
-			//$display("OUTP 8: %b", cpu_data_out);
-		end
+		// else if(ADDR[3])
+		// begin
+		// 	// OUTP8 - ?
+		// 	//$display("OUTP 8: %b", cpu_data_out);
+		// end
 		else
 		begin
-			$display("OUTP: %b %b", ADDR[3:0], cpu_data_out);
+			//$display("OUTP: %b %b", ADDR[3:0], cpu_data_out);
 		end
+	end
+
+	if(u50_4)
+	begin
+		$display("ENV");
 	end
 end
 
+// SOUND SAMPLE
+
 //assign audio_l = { 2'b0, u66_q, 10'b0 };
 // assign audio_r = { 2'b0, u66_q, 10'b0 };
-assign audio_l = !u60_2_q ? -20000 : 20000;
-assign audio_r = !u68_out ? -12000 : 12000;
+//wire signed [15:0] sound_out = (u6766_p == 8'hFF) ? 0 : (!u60_2_q ? -30000 : 30000);
+wire signed [15:0] sound_out = (!u60_2_q ? -30000 : 30000);
+
+// Low-pass filter the audio output
+wire signed [15:0] sound_filtered;
+blockade_lpf lpf
+(
+	.clk(clk),
+	.reset(reset),
+	.in(sound_out),
+	.out(sound_filtered)
+);
+// Invert the 
+assign audio_l = 16'hFFFF - sound_filtered;
+assign audio_r = sound_out;
 
 
-// MEMORY
-// ------
+// U2, U3 - Program ROM
+// --------------------
+// Each ROM is 1024 x 4 bytes.  Combined to 8 bytes with U2 as most significant bits, U3 as least significant bits
+
+// Program ROM data outs
 wire [3:0] rom_data_out_lsb;
 wire [3:0] rom_data_out_msb;
 wire [7:0] rom_data_out = { rom_data_out_msb, rom_data_out_lsb };
 
-// U2, U3 - Program ROM
-dpram #(10,4, "316-0003.u3.hex") rom_lsb
+// Program ROM download write enables
+wire rom_lsb_wr = dn_addr[12:10] == 3'b000 && dn_wr;
+wire rom_msb_wr = dn_addr[12:10] == 3'b001 && dn_wr;
+
+// Program ROM - U3 - Least-significant bits
+dpram #(10,4) rom_lsb
 (
 	.clock_a(clk),
 	.address_a(ADDR[9:0]),
@@ -386,12 +406,13 @@ dpram #(10,4, "316-0003.u3.hex") rom_lsb
 	.q_a(rom_data_out_lsb),
 
 	.clock_b(clk),
-	.address_b(),
-	.wren_b(),
-	.data_b(),
+	.address_b(dn_addr[9:0]),
+	.wren_b(rom_lsb_wr),
+	.data_b(dn_data[3:0]),
 	.q_b()
 );
-dpram #(10,4, "316-0004.u2.hex") rom_msb
+// Program ROM - U2 - Most-significant bits
+dpram #(10,4) rom_msb
 (
 	.clock_a(clk),
 	.address_a(ADDR[9:0]),
@@ -400,15 +421,26 @@ dpram #(10,4, "316-0004.u2.hex") rom_msb
 	.q_a(rom_data_out_msb),
 
 	.clock_b(clk),
-	.address_b(),
-	.wren_b(),
-	.data_b(),
+	.address_b(dn_addr[9:0]),
+	.wren_b(rom_msb_wr),
+	.data_b(dn_data[3:0]),
 	.q_b()
 );
 
-// U38, U39, U40, U41, U42 - 2102 - Video RAM (dual-ported for simplicity)
-wire [7:0] vram_data_out_cpu;
-wire [7:0] vram_data_out;
+// U38, U39, U40, U41, U42 - 2102 - Video RAM
+// ------------------------------------------
+// The original board used logic to allow CPU to write during VBLANK and the video system to read otherwise - I have used dual port RAM for simplicity
+// In Blockade only 5-bits per address is used, but Comotion and others use 8-bits
+
+// Data outs
+wire [7:0] vram_data_out_cpu;	// Data read by CPU
+wire [7:0] vram_data_out;		// Data read by video system
+
+// Video RAM address select and write enable
+wire vram_cs = ADDR[15] && !ADDR[12];
+wire vram_we = vram_cs && !WR_N;
+
+// U38, U39, U40, U41, U42 combined
 dpram #(10,8) ram
 (
 	.clock_a(clk),
@@ -424,8 +456,18 @@ dpram #(10,8) ram
 	.q_b(vram_data_out_cpu)
 );
 
+
 // U6, U7 - 2111 - Static RAM
+// --------------------------
+
+// Static RAM Data out
 wire [7:0]	sram_data_out;
+
+// Static RAM address select and write enable
+wire sram_cs = ADDR[15] && ADDR[12];
+wire sram_we = sram_cs && !WR_N;
+
+// U6, U7 combined
 spram #(8,8) sram
 (
 	.clk(clk),
@@ -435,13 +477,24 @@ spram #(8,8) sram
 	.q(sram_data_out)
 );
 
-// U29, U43 - GFX PROMs
+// U29, U43 - Graphics PROMs
+// --------------------
+// Each ROM is 256 x 4 bytes.  Combined to 8 bytes with U29 as most significant bits, U43 as least significant bits
+
+// Graphics PROM data outs
 wire [3:0] prom_data_out_lsb;
 wire [3:0] prom_data_out_msb;
 wire [7:0] prom_data_out = { prom_data_out_msb, prom_data_out_lsb } ;
+
+// Graphics PROM read adress
 wire [7:0] prom_addr = { vram_data_out[4:0], s_4V, s_2V, s_1V };
 
-dpram #(8,4, "316-0001.u43.hex") prom_lsb
+// Graphics ROM download write enables
+wire prom_lsb_wr = dn_addr[12:8] == 5'b10000 && dn_wr;
+wire prom_msb_wr = dn_addr[12:8] == 5'b10001 && dn_wr;
+
+// Graphics ROM - U43 - Least-significant bits
+dpram #(8,4) prom_lsb
 (
 	.clock_a(clk),
 	.address_a(prom_addr),
@@ -450,12 +503,13 @@ dpram #(8,4, "316-0001.u43.hex") prom_lsb
 	.q_a(prom_data_out_lsb),
 
 	.clock_b(clk),
-	.address_b(),
-	.wren_b(),
-	.data_b(),
+	.address_b(dn_addr[7:0]),
+	.wren_b(prom_lsb_wr),
+	.data_b(dn_data[3:0]),
 	.q_b()
 );
-dpram #(8,4, "316-0002.u29.hex") prom_msb
+// Graphics PROM - U29 - Most-significant bits
+dpram #(8,4) prom_msb
 (
 	.clock_a(clk),
 	.address_a(prom_addr),
@@ -464,10 +518,24 @@ dpram #(8,4, "316-0002.u29.hex") prom_msb
 	.q_a(prom_data_out_msb),
 
 	.clock_b(clk),
-	.address_b(),
-	.wren_b(),
-	.data_b(),
+	.address_b(dn_addr[7:0]),
+	.wren_b(prom_msb_wr),
+	.data_b(dn_data[3:0]),
 	.q_b()
+);
+
+
+
+reg [15:0] sound_rom_addr;
+wire [7:0] sound_rom_data_out;
+// Sound samples
+spram #(16,8, "sound.hex") sound_rom
+(
+	.clk(clk),
+	.address(sound_rom_addr),
+	.wren(1'b0),
+	.data(),
+	.q(sound_rom_data_out)
 );
 
 endmodule

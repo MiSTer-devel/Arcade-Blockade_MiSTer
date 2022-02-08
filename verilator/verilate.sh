@@ -10,6 +10,7 @@ verilator \
 --top-module emu sim.v \
 -I../rtl \
 -I../rtl/ic \
+-I../rtl/audio \
 -I../rtl/tv80
 else
 	echo "not running on windows"

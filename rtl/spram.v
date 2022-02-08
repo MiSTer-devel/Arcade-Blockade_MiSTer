@@ -22,8 +22,8 @@
 ===========================================================================*/
 
 module spram # (
-	parameter data_width = 8,
 	parameter address_width = 8,
+	parameter data_width = 8,
 	parameter init_file= ""
 )
 (

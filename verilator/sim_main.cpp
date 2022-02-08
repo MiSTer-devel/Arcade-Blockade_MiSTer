@@ -36,7 +36,7 @@ using namespace std;
 // ------------------
 int initialReset = 48;
 bool run_enable = 1;
-int batchSize = 25000000 / 100000;
+int batchSize = 25000000 / 100;
 bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
@@ -438,6 +438,15 @@ int main(int argc, char** argv, char** env)
 	input.SetMapping(input_coin_3, SDL_SCANCODE_5);
 	input.SetMapping(input_pause, SDL_SCANCODE_P);
 #endif
+
+	// Stage ROMs
+	bus.QueueDownload("roms/blockade/316-0003.u3", 0);
+	bus.QueueDownload("roms/blockade/316-0004.u2", 0);
+	bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/blockade/316-0001.u43",0);
+	bus.QueueDownload("roms/blockade/316-0002.u29",0);
+
 	// Setup video output
 	if (video.Initialise(windowTitle) == 1) { return 1; }
 
@@ -504,57 +513,19 @@ int main(int argc, char** argv, char** env)
 		ImGui::SetWindowPos(windowTitle_DebugLog, ImVec2(0, 160), ImGuiCond_Once);
 
 		// Memory debug
-		//ImGui::Begin("PGROM Editor");
-		//mem_edit.DrawContents(top->emu__DOT__system__DOT__pgrom__DOT__mem, 32768, 0);
-		//ImGui::End();
-		//ImGui::Begin("CHROM Editor");
-		//mem_edit.DrawContents(top->emu__DOT__system__DOT__chrom__DOT__mem, 2048, 0);
-		//ImGui::End();
-		//ImGui::Begin("WKRAM Editor");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__wkram__DOT__mem, 16384, 0);
-		//ImGui::End();
-		//ImGui::Begin("CHRAM Editor");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__chram__DOT__mem, 2048, 0);
-		//ImGui::End();
-		//ImGui::Begin("FGCOLRAM Editor");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__fgcolram__DOT__mem, 2048, 0);
-		//ImGui::End();
-		//ImGui::Begin("BGCOLRAM Editor");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__bgcolram__DOT__mem, 2048, 0);
-		//ImGui::End();
-		//ImGui::Begin("Sprite RAM");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spriteram__DOT__mem, 96, 0);
-		//ImGui::End();
-		//ImGui::Begin("Sprite Linebuffer RAM");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spritelbram__DOT__mem, 1024, 0);
-		//ImGui::End();
-		//ImGui::Begin("Sprite Collision Buffer RAM A");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__comet__DOT__spritecollisionbufferram_a__DOT__mem, 512, 0);
-		//ImGui::End();
-		//ImGui::Begin("Sprite Collision Buffer RAM B");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__comet__DOT__spritecollisionbufferram_b__DOT__mem, 512, 0);
-		//ImGui::End();
-		//ImGui::Begin("Sprite Collision RAM ");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spritecollisionram__DOT__mem, 32, 0);
-		//ImGui::End();
-		//ImGui::Begin("Sprite Debug RAM");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spritedebugram__DOT__mem, 128000, 0);
-		//ImGui::End();
-		//ImGui::Begin("Palette ROM");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__palrom__DOT__mem, 64, 0);
-		//ImGui::End();
-		//ImGui::Begin("Sprite ROM");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__spriterom__DOT__mem, 2048, 0);
-		//ImGui::End();
-		//ImGui::Begin("Tilemap ROM");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__tilemaprom__DOT__mem, 8192, 0);
-		//ImGui::End();
-		//ImGui::Begin("Tilemap RAM");
-		//	mem_edit.DrawContents(&top->emu__DOT__system__DOT__tilemapram__DOT__mem, 768, 0);
-		//ImGui::End();
-		//ImGui::Begin("Sound ROM");
-		//mem_edit.DrawContents(&top->emu__DOT__system__DOT__soundrom__DOT__mem, 64000, 0);
-		//ImGui::End();
+		ImGui::Begin("ROM MSB");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 1024, 0);
+		ImGui::End();
+		ImGui::Begin("ROM LSB");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 1024, 0);
+		ImGui::End();
+
+		ImGui::Begin("PROM MSB");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__prom_msb__DOT__mem, 256, 0);
+		ImGui::End();
+		ImGui::Begin("PROM LSB");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__prom_lsb__DOT__mem, 256, 0);
+		ImGui::End();
 		int windowX = 550;
 		int windowWidth = (VGA_WIDTH * VGA_SCALE_X) + 24;
 		int windowHeight = (VGA_HEIGHT * VGA_SCALE_Y) + 90;

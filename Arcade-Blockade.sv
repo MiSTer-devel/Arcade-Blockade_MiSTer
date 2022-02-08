@@ -186,8 +186,6 @@ assign VGA_SCALER = 0;
 assign HDMI_FREEZE = 0;
 
 assign AUDIO_S = 0;
-assign AUDIO_L = 0;
-assign AUDIO_R = 0;
 assign AUDIO_MIX = 0;
 
 assign LED_DISK = 0;
@@ -357,7 +355,9 @@ blockade blockade (
 	.vblank(vblank),
 	.dn_addr(ioctl_addr[13:0]),
 	.dn_data(ioctl_dout),
-	.dn_wr(ioctl_wr & rom_download)
+	.dn_wr(ioctl_wr & rom_download),
+	.audio_l(AUDIO_L),
+	.audio_r(AUDIO_R)
 );
-   
+
 endmodule
