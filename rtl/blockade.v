@@ -3,6 +3,7 @@
 module blockade (
 	input clk,
 	input reset,
+	input [1:0] game_mode,
 
 	output ce_pix,
 	output r,
@@ -16,14 +17,19 @@ module blockade (
 	output signed [15:0] audio_l,
 	output signed [15:0] audio_r,
 
-	input [7:0] in0,
-	input [7:0] in1,
-	input [7:0] in2,
+	input [7:0] in_1,
+	input [7:0] in_2,
+	input [7:0] in_4,
+	input coin,
 
 	input [13:0] dn_addr,
 	input 		 dn_wr,
 	input [7:0]  dn_data
 );
+
+// Game mode constants
+localparam GAME_BLOCKADE = 0;
+localparam GAME_COMOTION = 1;
 
 // Generate video and CPU enables
 // - Replaces U31, U17, U8, U18 section of circuit
@@ -66,17 +72,31 @@ always @(posedge clk) begin
 end
 
 // Address decode
-wire rom_cs = (!ADDR[15] && !ADDR[11] && !ADDR[10]);
+wire rom1_cs = (!ADDR[15] && !ADDR[11] && !ADDR[10] && MEMR);
+wire rom2_cs = (!ADDR[15] && !ADDR[11] && ADDR[10] && MEMR);
 
 // Input data selector
-wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? in0 : // IN0 - Not connected in Blockade
-							(ADDR[1:0] == 2'd1) ? in1 : // IN1
-							(ADDR[1:0] == 2'd2) ? in2 : // IN2
+reg [7:0] IN_1;
+reg [7:0] IN_2;
+reg [7:0] IN_4;
+always @(posedge clk) begin
+	IN_1 <= in_1;
+	IN_2 <= in_2;
+	IN_4 <= in_4;
+	case(game_mode)
+	GAME_BLOCKADE: IN_1[7] <= coin;
+	GAME_COMOTION: IN_2[7] <= coin_latch;
+	endcase
+end
+wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? IN_1 : // IN_1
+							(ADDR[1:0] == 2'd1) ? IN_2 : // IN_2
+							(ADDR[1:0] == 2'd2) ? IN_4 : // IN_4 - Not connected in Blockade
 							8'h00;
 
 // CPU data selector
 wire [7:0] cpu_data_in = INP ? inp_data_out :
-						 rom_cs ? rom_data_out :
+						 rom1_cs ? rom1_data_out :
+						 rom2_cs ? rom2_data_out :
 						 vram_cs ? vram_data_out_cpu :
 						 sram_cs ? sram_data_out :
 						 8'h00;
@@ -86,12 +106,13 @@ wire [7:0] DATA;
 wire DBIN;
 wire WR_N;
 wire SYNC /*verilator public_flat*/;
+wire RESET = reset || (game_mode == GAME_COMOTION && coin_start > 4'b0);
 vm80a cpu
 (
 	.pin_clk(clk),
 	.pin_f1(PHI_1),
 	.pin_f2(PHI_2),
-	.pin_reset(reset),
+	.pin_reset(RESET),
 	.pin_a(ADDR),
 	.pin_d(DATA),
 	.pin_hold(1'b0),
@@ -127,27 +148,9 @@ localparam VBLANK_START = 9'd224;
 localparam VBLANK_END = 9'd261;
 localparam VRESET_LINE = 9'd261;
 
-// Counters
+// Video counters
 reg [8:0] hcnt;
-//wire s_1H = hcnt[0];
-//wire s_2H = hcnt[1];
-//wire s_4H = hcnt[2];
-//wire s_8H = hcnt[3];
-//wire s_16H = hcnt[4];
-//wire s_32H = hcnt[5];
-//wire s_64H = hcnt[6];
-//wire s_128H = hcnt[7];
-//wire s_256H = hcnt[8];
 reg [8:0] vcnt;
-wire s_1V = vcnt[0];
-wire s_2V = vcnt[1];
-wire s_4V = vcnt[2];
-//wire s_8V = vcnt[3];
-//wire s_16V = vcnt[4];
-//wire s_32V = vcnt[5];
-//wire s_64V = vcnt[6];
-//wire s_128V = vcnt[7];
-//wire s_256V = vcnt[8];
 
 // Signals
 reg HBLANK_N = 1'b1;
@@ -158,7 +161,7 @@ wire VSYNC_N = ~(vcnt >= VSYNC_START && vcnt <= VSYNC_END);
 
 // Video read addresses
 reg [2:0] prom_col;
-wire [9:0] vram_read_addr = { vcnt[7:3], hcnt[7:3] }; // Generate VRAM read address from h/v counters { s_128V, s_64V, s_32V, s_16V, s_8V, s_128H, s_64H, s_32H, s_16H, s_8H };
+wire [9:0] vram_read_addr = { vcnt[7:3], hcnt[7:3] }; // Generate VRAM read address from h/v counters { 128V, 64V, 32V, 16V, 8V, 128H, 64H, 32H, 16H, 8H };
 
 always @(posedge clk)
 begin
@@ -206,44 +209,20 @@ assign vsync = ~VSYNC_N;
 
 // U45 AND - Enable for U51 latch
 wire u45 = PHI_1 && SYNC;
-
-reg [31:0] timer;
-
 // U51 latch
-reg l_D7;
-reg l_D6;
-reg l_D4;
-reg l_D3;
+reg [3:0] u51_latch;
 always @(posedge clk) begin
-	timer <= timer + 32'b1;
-	if(u45)
-	begin
-		l_D7 <= DATA[7];
-		l_D6 <= DATA[6];
-		l_D4 <= DATA[4];
-		l_D3 <= DATA[3];
-	end
+	if(u45) u51_latch <= { DATA[7:6], DATA[4:3] };
 end
 
 // U45_1
-wire OUTP = l_D4 && ~WR_N;
+wire OUTP = u51_latch[1] && ~WR_N;
 // U44_1
-wire MEMW = (l_D3 && ~WR_N);
+wire MEMW = (u51_latch[0] && ~WR_N);
 // U45_2
-wire INP = (l_D6 && DBIN);
+wire INP = (u51_latch[2] && DBIN);
 // U44_2
-wire MEMR = (l_D7 && DBIN);
-
-// U1 - 7442 BCD to decimal decoder
-// wire [9:0] u1_q;
-// ttl_7442 u1
-// (
-// 	.a(ADDR[10]),
-// 	.b(ADDR[11]),
-// 	.c(ADDR[15]),
-// 	.d(~MEMR),
-// 	.o(u1_q)
-// );
+wire MEMR = (u51_latch[3] && DBIN);
 
 
 // AUDIO
@@ -323,9 +302,6 @@ begin
 	end
 end
 
-reg [31:0] timer_last_outp2;
-reg OUTP_last;
-
 wire u50_1 = ~(OUTP && ADDR[3]);
 wire u50_2 = ~(OUTP && ADDR[2]);
 /* verilator lint_off UNOPTFLAT */
@@ -333,17 +309,20 @@ wire u50_3 = ~(u50_1 && u50_4);
 wire u50_4 = ~(u50_2 && u50_3);
 /* verilator lint_on UNOPTFLAT */
 
+// OUTP1 - Coin latch
+wire OUTP1 = OUTP && ADDR[0];
+reg u14_3qn;
+reg coin_last;
+reg coin_latch;
+reg [3:0] coin_start;
+
 always @(posedge clk) begin
-//	OUTP_last <= OUTP;
-//	if(OUTP && !OUTP_last)
 	if(OUTP)
 	begin
 		if(ADDR[1])
 		begin
 			// OUTP2 - Movement sound latch
-			//$display("(%d) Latching OUTP 2 %b %b >> %b %b  (%d)", timer, u66_p, u67_p, cpu_data_out[7:4], cpu_data_out[3:0], timer - timer_last_outp2);
 			u6766_p <= DATA;
-			timer_last_outp2 <= timer;
 		end
 		// else if(ADDR[3])
 		// begin
@@ -356,10 +335,33 @@ always @(posedge clk) begin
 		end
 	end
 
-	if(u50_4)
+	if(OUTP1)
 	begin
-		$display("ENV");
+		$display("OUTP1 %b", ~DATA[7]);
+		u14_3qn <= ~DATA[7];
 	end
+
+	coin_last <= coin;
+	if(coin_start>4'b0) coin_start <= coin_start - 4'b1;
+
+	if(~u14_3qn) 
+	begin
+		if(coin_latch) $display("u14_3qn coin_latch = 0");
+		coin_latch <= 1'b0;
+	end
+	else
+	begin
+		if(coin && !coin_last)
+		begin
+			$display("u14_3qn coin_latch = 1");
+			coin_latch <= 1'b1;
+			coin_start <= 4'b1111;
+		end
+	end
+	// if(u50_4)
+	// begin
+	// 	$display("ENV");
+	// end
 end
 
 // SOUND SAMPLE
@@ -385,44 +387,81 @@ assign audio_r = sound_out;
 
 // U2, U3 - Program ROM
 // --------------------
-// Each ROM is 1024 x 4 bytes.  Combined to 8 bytes with U2 as most significant bits, U3 as least significant bits
+// Each ROM is 1024 x 4 bytes.  Each pair is combined to 8 bytes:
+// - U2 as most significant bits, U3 as least significant bits
+// - U4 as most significant bits, U5 as least significant bits (not used by Blockade)
 
 // Program ROM data outs
-wire [3:0] rom_data_out_lsb;
-wire [3:0] rom_data_out_msb;
-wire [7:0] rom_data_out = { rom_data_out_msb, rom_data_out_lsb };
+wire [3:0] rom1_data_out_lsb;
+wire [3:0] rom1_data_out_msb;
+wire [7:0] rom1_data_out = { rom1_data_out_msb, rom1_data_out_lsb };
+wire [3:0] rom2_data_out_lsb;
+wire [3:0] rom2_data_out_msb;
+wire [7:0] rom2_data_out = { rom2_data_out_msb, rom2_data_out_lsb };
 
 // Program ROM download write enables
-wire rom_lsb_wr = dn_addr[12:10] == 3'b000 && dn_wr;
-wire rom_msb_wr = dn_addr[12:10] == 3'b001 && dn_wr;
+wire rom1_msb_wr = dn_addr[12:10] == 3'b000 && dn_wr;
+wire rom1_lsb_wr = dn_addr[12:10] == 3'b001 && dn_wr;
+wire rom2_msb_wr = dn_addr[12:10] == 3'b010 && dn_wr;
+wire rom2_lsb_wr = dn_addr[12:10] == 3'b011 && dn_wr;
 
-// Program ROM - U3 - Least-significant bits
-dpram #(10,4) rom_lsb
+// Program ROM - U2 - Most-significant bits
+dpram #(10,4) rom1_msb
 (
 	.clock_a(clk),
 	.address_a(ADDR[9:0]),
 	.wren_a(1'b0),
 	.data_a(),
-	.q_a(rom_data_out_lsb),
+	.q_a(rom1_data_out_msb),
 
 	.clock_b(clk),
 	.address_b(dn_addr[9:0]),
-	.wren_b(rom_lsb_wr),
+	.wren_b(rom1_msb_wr),
 	.data_b(dn_data[3:0]),
 	.q_b()
 );
-// Program ROM - U2 - Most-significant bits
-dpram #(10,4) rom_msb
+// Program ROM - U3 - Least-significant bits
+dpram #(10,4) rom1_lsb
 (
 	.clock_a(clk),
 	.address_a(ADDR[9:0]),
 	.wren_a(1'b0),
 	.data_a(),
-	.q_a(rom_data_out_msb),
+	.q_a(rom1_data_out_lsb),
 
 	.clock_b(clk),
 	.address_b(dn_addr[9:0]),
-	.wren_b(rom_msb_wr),
+	.wren_b(rom1_lsb_wr),
+	.data_b(dn_data[3:0]),
+	.q_b()
+);
+// Program ROM - U4 - Most-significant bits
+dpram #(10,4) rom2_msb
+(
+	.clock_a(clk),
+	.address_a(ADDR[9:0]),
+	.wren_a(1'b0),
+	.data_a(),
+	.q_a(rom2_data_out_msb),
+
+	.clock_b(clk),
+	.address_b(dn_addr[9:0]),
+	.wren_b(rom2_msb_wr),
+	.data_b(dn_data[3:0]),
+	.q_b()
+);
+// Program ROM - U5 - Least-significant bits
+dpram #(10,4) rom2_lsb
+(
+	.clock_a(clk),
+	.address_a(ADDR[9:0]),
+	.wren_a(1'b0),
+	.data_a(),
+	.q_a(rom2_data_out_lsb),
+
+	.clock_b(clk),
+	.address_b(dn_addr[9:0]),
+	.wren_b(rom2_lsb_wr),
 	.data_b(dn_data[3:0]),
 	.q_b()
 );
@@ -487,27 +526,12 @@ wire [3:0] prom_data_out_msb;
 wire [7:0] prom_data_out = { prom_data_out_msb, prom_data_out_lsb } ;
 
 // Graphics PROM read adress
-wire [7:0] prom_addr = { vram_data_out[4:0], s_4V, s_2V, s_1V };
+wire [7:0] prom_addr = { vram_data_out[4:0], vcnt[2:0] };
 
 // Graphics ROM download write enables
-wire prom_lsb_wr = dn_addr[12:8] == 5'b10000 && dn_wr;
-wire prom_msb_wr = dn_addr[12:8] == 5'b10001 && dn_wr;
+wire prom_msb_wr = dn_addr[12:8] == 5'b10000 && dn_wr;
+wire prom_lsb_wr = dn_addr[12:8] == 5'b10001 && dn_wr;
 
-// Graphics ROM - U43 - Least-significant bits
-dpram #(8,4) prom_lsb
-(
-	.clock_a(clk),
-	.address_a(prom_addr),
-	.wren_a(1'b0),
-	.data_a(),
-	.q_a(prom_data_out_lsb),
-
-	.clock_b(clk),
-	.address_b(dn_addr[7:0]),
-	.wren_b(prom_lsb_wr),
-	.data_b(dn_data[3:0]),
-	.q_b()
-);
 // Graphics PROM - U29 - Most-significant bits
 dpram #(8,4) prom_msb
 (
@@ -523,7 +547,21 @@ dpram #(8,4) prom_msb
 	.data_b(dn_data[3:0]),
 	.q_b()
 );
+// Graphics ROM - U43 - Least-significant bits
+dpram #(8,4) prom_lsb
+(
+	.clock_a(clk),
+	.address_a(prom_addr),
+	.wren_a(1'b0),
+	.data_a(),
+	.q_a(prom_data_out_lsb),
 
+	.clock_b(clk),
+	.address_b(dn_addr[7:0]),
+	.wren_b(prom_lsb_wr),
+	.data_b(dn_data[3:0]),
+	.q_b()
+);
 
 
 reg [15:0] sound_rom_addr;

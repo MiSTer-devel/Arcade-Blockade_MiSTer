@@ -1,7 +1,7 @@
 <misterromdescription>
-	<name>Blockade</name>
+	<name>Comotion</name>
 
-	<setname>blockade</setname>
+	<setname>comotion</setname>
 	<mameversion>0225</mameversion>
 	<rbf>Blockade</rbf>
 
@@ -10,18 +10,17 @@
 		<dip bits="0,1" ids="3,4,5,6" name="Lives" values="0,1,2,3"></dip>
 	</switches>
 
-	<rom index="1">0</rom>
-	<rom index="0" md5="none" zip="blockade.zip">
+	<rom index="1">1</rom>
+	<rom index="0" md5="none" zip="comotion.zip">
 		<!-- GAME ROMS -->
-		<part crc="none" name="316-0004.u2"/>
-		<part crc="none" name="316-0003.u3"/>
-
-		<!-- PADDING -->
-		<part repeat="2048">00</part>
+		<part crc="none" name="316-0007.u2"/>
+		<part crc="none" name="316-0008.u3"/>
+		<part crc="none" name="316-0009.u4"/>
+		<part crc="none" name="316-0010.u5"/>
 
 		<!-- GFX PROMS -->
-		<part crc="none" name="316-0002.u29"/>
-		<part crc="none" name="316-0001.u43"/>
+		<part crc="none" name="316-0006.u43"/>
+		<part crc="none" name="316-0005.u29"/>
 	</rom>
 	<rom index="2"></rom>
 	<rom index="3"></rom>

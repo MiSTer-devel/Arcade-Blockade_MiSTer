@@ -41,6 +41,10 @@ bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
 
+#define IS_BLOCKADE
+//#define IS_COMOTION
+
+
 // Debug GUI 
 // ---------
 const char* windowTitle = "Verilator Sim: Sega/Gremlin - Blockade";
@@ -70,7 +74,8 @@ const int input_p2_left = 5;
 const int input_p2_down = 6;
 const int input_p2_up = 7;
 
-const int input_coin_1 = 8;
+const int input_coin = 8;
+const int input_start = 9;
 
 // Video
 // -----
@@ -109,13 +114,22 @@ void resetSim()
 SimAudio audio(clk_sys_freq, true);
 #endif
 
+#ifdef IS_BLOCKADE
+std::string tracefilename = "blockade.tr";
+int game_mode = 0;
+#endif
+#ifdef IS_COMOTION 
+std::string tracefilename = "comotion.tr";
+int game_mode = 1;
+#endif
 
 // MAME debug log
-#define CPU_DEBUG
+//#define CPU_DEBUG
 
 #ifdef CPU_DEBUG
 bool log_instructions = false;
 bool stop_on_log_mismatch = false;
+
 
 std::vector<std::string> log_mame;
 std::vector<std::string> log_cpu;
@@ -392,7 +406,7 @@ int main(int argc, char** argv, char** env)
 
 	// Load debug trace
 	std::string line;
-	std::ifstream fin("blockade.tr");
+	std::ifstream fin(tracefilename);
 	while (getline(fin, line)) {
 		log_mame.push_back(line);
 	}
@@ -424,7 +438,8 @@ int main(int argc, char** argv, char** env)
 	input.SetMapping(input_p2_right, DIK_D);
 	input.SetMapping(input_p2_down, DIK_S);
 	input.SetMapping(input_p2_left, DIK_A);
-	input.SetMapping(input_coin_1, DIK_5);
+	input.SetMapping(input_coin, DIK_5);
+	input.SetMapping(input_start, DIK_1);
 #else
 	input.SetMapping(input_up, SDL_SCANCODE_UP);
 	input.SetMapping(input_right, SDL_SCANCODE_RIGHT);
@@ -440,12 +455,28 @@ int main(int argc, char** argv, char** env)
 #endif
 
 	// Stage ROMs
-	bus.QueueDownload("roms/blockade/316-0003.u3", 0);
+
+#ifdef IS_BLOCKADE
 	bus.QueueDownload("roms/blockade/316-0004.u2", 0);
-	bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/blockade/316-0003.u3", 0);
 	bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat Blockade ROMs for padding
-	bus.QueueDownload("roms/blockade/316-0001.u43",0);
-	bus.QueueDownload("roms/blockade/316-0002.u29",0);
+	bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/blockade/316-0002.u29", 0);
+	bus.QueueDownload("roms/blockade/316-0001.u43", 0);
+#endif
+
+#ifdef IS_COMOTION
+	bus.QueueDownload("roms/comotion/316-07.u2", 0);
+	bus.QueueDownload("roms/comotion/316-08.u3", 0);
+	bus.QueueDownload("roms/comotion/316-09.u4", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/comotion/316-10.u5", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/comotion/316-06.u43", 0);
+	bus.QueueDownload("roms/comotion/316-05.u29", 0);
+#endif
+
+	// Set game mode
+	top->emu__DOT__game_mode = game_mode;
+	
 
 	// Setup video output
 	if (video.Initialise(windowTitle) == 1) { return 1; }
@@ -513,19 +544,25 @@ int main(int argc, char** argv, char** env)
 		ImGui::SetWindowPos(windowTitle_DebugLog, ImVec2(0, 160), ImGuiCond_Once);
 
 		// Memory debug
-		ImGui::Begin("ROM MSB");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_msb__DOT__mem, 1024, 0);
+		ImGui::Begin("ROM1 MSB");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom1_msb__DOT__mem, 1024, 0);
 		ImGui::End();
-		ImGui::Begin("ROM LSB");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom_lsb__DOT__mem, 1024, 0);
+		ImGui::Begin("ROM1 LSB");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom1_lsb__DOT__mem, 1024, 0);
+		ImGui::End();
+		ImGui::Begin("ROM2 MSB");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom2_msb__DOT__mem, 1024, 0);
+		ImGui::End();
+		ImGui::Begin("ROM2 LSB");
+		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom2_lsb__DOT__mem, 1024, 0);
 		ImGui::End();
 
-		ImGui::Begin("PROM MSB");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__prom_msb__DOT__mem, 256, 0);
-		ImGui::End();
-		ImGui::Begin("PROM LSB");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__prom_lsb__DOT__mem, 256, 0);
-		ImGui::End();
+		//ImGui::Begin("PROM MSB");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__prom_msb__DOT__mem, 256, 0);
+		//ImGui::End();
+		//ImGui::Begin("PROM LSB");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__prom_lsb__DOT__mem, 256, 0);
+		//ImGui::End();
 		int windowX = 550;
 		int windowWidth = (VGA_WIDTH * VGA_SCALE_X) + 24;
 		int windowHeight = (VGA_HEIGHT * VGA_SCALE_Y) + 90;
