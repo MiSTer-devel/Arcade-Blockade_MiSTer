@@ -74,17 +74,13 @@ module emu(
 	always @(posedge clk_sys) begin
 		case (game_mode)
 		GAME_BLOCKADE: begin 
-			IN_1 <= ~{1'b0, blockade_dip_lives_5, 1'b0, btn_boom, 2'b00}; // Coin + DIPS
+			IN_1 <= ~{btn_coin, blockade_dip_lives_3, 1'b0, btn_boom, 2'b00}; // Coin + DIPS
 			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
 			IN_4 <= ~{8'b00000000}; // Unused
 		end
 		GAME_COMOTION: begin 
-			//IN_1 <= ~{btn_coin, comotion_dip_lives_4, 1'b0, btn_start, 1'b0, btn_boom, 2'b00}; // Coin + DIPS
-			IN_1 <= ~{p4_left, p4_down, p4_right, p4_up, p3_left, p3_down, p3_right, p3_up}; // P3 + P4 Controls
-			// IN_1 <= {8'b0};
-			//IN_2 <= ~{btn_coin, 2'b00, btn_start, comotion_dip_lives_3, btn_boom, 2'b00};
-			IN_2 <= ~{3'b0, btn_start, comotion_dip_lives_3, btn_boom, 2'b00};
-			//IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
+			IN_1 <= ~{btn_coin, 2'b0, btn_start, comotion_dip_lives_3, btn_boom, 2'b00}; // Coin + DIPS
+			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
 			IN_4 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
 		end
 		endcase

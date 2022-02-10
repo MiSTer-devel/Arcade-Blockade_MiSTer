@@ -31,6 +31,9 @@ module blockade (
 localparam GAME_BLOCKADE = 0;
 localparam GAME_COMOTION = 1;
 
+// CPU reset can come from reset signal or coin start signal
+wire RESET = reset || (game_mode == GAME_COMOTION && coin_start > 6'b0);
+
 // Generate video and CPU enables
 // - Replaces U31, U17, U8, U18 section of circuit
 reg [3:0] phi_count;
@@ -84,13 +87,18 @@ always @(posedge clk) begin
 	IN_2 <= in_2;
 	IN_4 <= in_4;
 	case(game_mode)
-	GAME_BLOCKADE: IN_1[7] <= coin;
-	GAME_COMOTION: IN_2[7] <= coin_latch;
+	GAME_BLOCKADE: IN_1[7] <= coin_latch;
+	GAME_COMOTION: IN_1[7] <= coin_latch;
 	endcase
+
+	if(INP && ADDR[0])
+	begin
+		$display("INP: IN_1=%b IN_2=%b IN_4=%b", ADDR[0], ADDR[1], ADDR[2]);
+	end
 end
-wire [7:0] inp_data_out =	(ADDR[1:0] == 2'd0) ? IN_1 : // IN_1
-							(ADDR[1:0] == 2'd1) ? IN_2 : // IN_2
-							(ADDR[1:0] == 2'd2) ? IN_4 : // IN_4 - Not connected in Blockade
+wire [7:0] inp_data_out =	ADDR[0] ? IN_1 : // IN_1
+							ADDR[1] ? IN_2 : // IN_2
+							ADDR[2] ? IN_4 : // IN_4 - Not connected in Blockade
 							8'h00;
 
 // CPU data selector
@@ -106,7 +114,6 @@ wire [7:0] DATA;
 wire DBIN;
 wire WR_N;
 wire SYNC /*verilator public_flat*/;
-wire RESET = reset || (game_mode == GAME_COMOTION && coin_start > 4'b0);
 vm80a cpu
 (
 	.pin_clk(clk),
@@ -233,7 +240,7 @@ ttl_555 #(
 	.LOW_COUNTS(51)
 ) u68 (
 	.clk(clk),
-	.reset(reset),
+	.reset(RESET),
 	.out(u68_out)
 );
 
@@ -244,7 +251,7 @@ reg u6766_out_last;
 always @(posedge clk)
 begin
 	u68_out_last <= u68_out;
-	if(reset)
+	if(RESET)
 	begin
 		u6766_count <= 8'b0;
 		u6766_out <= 1'b0;
@@ -279,7 +286,7 @@ reg u60_1_q;
 // U60_1 flip flop
 always @(posedge clk)
 begin
-	if(reset)
+	if(RESET)
 		u60_1_q <= 1'b0;
 	else
 		if(u60_1_ce) u60_1_q <= 1'b1;
@@ -301,69 +308,6 @@ begin
 		end
 	end
 end
-
-wire u50_1 = ~(OUTP && ADDR[3]);
-wire u50_2 = ~(OUTP && ADDR[2]);
-/* verilator lint_off UNOPTFLAT */
-wire u50_3 = ~(u50_1 && u50_4);
-wire u50_4 = ~(u50_2 && u50_3);
-/* verilator lint_on UNOPTFLAT */
-
-// OUTP1 - Coin latch
-wire OUTP1 = OUTP && ADDR[0];
-reg u14_3qn;
-reg coin_last;
-reg coin_latch;
-reg [3:0] coin_start;
-
-always @(posedge clk) begin
-	if(OUTP)
-	begin
-		if(ADDR[1])
-		begin
-			// OUTP2 - Movement sound latch
-			u6766_p <= DATA;
-		end
-		// else if(ADDR[3])
-		// begin
-		// 	// OUTP8 - ?
-		// 	//$display("OUTP 8: %b", cpu_data_out);
-		// end
-		else
-		begin
-			//$display("OUTP: %b %b", ADDR[3:0], cpu_data_out);
-		end
-	end
-
-	if(OUTP1)
-	begin
-		$display("OUTP1 %b", ~DATA[7]);
-		u14_3qn <= ~DATA[7];
-	end
-
-	coin_last <= coin;
-	if(coin_start>4'b0) coin_start <= coin_start - 4'b1;
-
-	if(~u14_3qn) 
-	begin
-		if(coin_latch) $display("u14_3qn coin_latch = 0");
-		coin_latch <= 1'b0;
-	end
-	else
-	begin
-		if(coin && !coin_last)
-		begin
-			$display("u14_3qn coin_latch = 1");
-			coin_latch <= 1'b1;
-			coin_start <= 4'b1111;
-		end
-	end
-	// if(u50_4)
-	// begin
-	// 	$display("ENV");
-	// end
-end
-
 // SOUND SAMPLE
 
 //assign audio_l = { 2'b0, u66_q, 10'b0 };
@@ -376,13 +320,68 @@ wire signed [15:0] sound_filtered;
 blockade_lpf lpf
 (
 	.clk(clk),
-	.reset(reset),
+	.reset(RESET),
 	.in(sound_out),
 	.out(sound_filtered)
 );
 // Invert the 
 assign audio_l = 16'hFFFF - sound_filtered;
 assign audio_r = sound_out;
+
+
+///// OUTPUT CONTROL
+
+wire u50_1 = ~(OUTP && ADDR[3]);
+wire u50_2 = ~(OUTP && ADDR[2]);
+/* verilator lint_off UNOPTFLAT */
+wire u50_3 = ~(u50_1 && u50_4);
+wire u50_4 = ~(u50_2 && u50_3);
+/* verilator lint_on UNOPTFLAT */
+
+// OUTP1 - Coin latch
+wire OUTP1 = OUTP && ADDR[0];
+wire OUTP2 = OUTP && ADDR[1];
+reg u14_3qn;
+reg coin_last;
+reg [5:0] coin_start;
+reg coin_latch;
+
+always @(posedge clk) begin
+
+	if(reset) coin_latch <= 1'b1;
+
+	if(coin_start > 6'b0) coin_start <= coin_start - 6'b1;
+	
+	if(OUTP2) u6766_p <= DATA; // OUTP2 - Movement sound latch
+
+	if(OUTP1)
+	begin
+		$display("OUTP1 %b", ~DATA[7]);
+		u14_3qn <= ~DATA[7];
+	end
+	
+	if(u14_3qn)
+	begin
+		//if(!coin_latch) $display("u14_3qn coin_latch = 0");
+		//coin_latch <= 1'b1;
+	end
+
+	coin_last <= coin;
+	if(coin && !coin_last)
+	begin
+		// $display("u14_3qn coin_latch = 1");
+		$display("coin pulse started");
+		coin_latch <= ~coin_latch;
+		if(coin_latch) coin_start <= 6'b1;
+	end
+
+	// end
+	// if(u50_4)
+	// begin
+	// 	$display("ENV");
+	// end
+end
+
 
 
 // U2, U3 - Program ROM

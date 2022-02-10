@@ -41,8 +41,8 @@ bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
 
-#define IS_BLOCKADE
-//#define IS_COMOTION
+//#define IS_BLOCKADE
+#define IS_COMOTION
 
 
 // Debug GUI 
