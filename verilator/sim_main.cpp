@@ -42,8 +42,9 @@ bool multi_step = 0;
 int multi_step_amount = 1024;
 
 //#define IS_BLOCKADE
-//#define IS_COMOTION
-#define IS_HUSTLE
+#define IS_COMOTION
+//#define IS_HUSTLE
+//#define IS_BLASTO
 
 
 // Debug GUI 
@@ -63,7 +64,7 @@ SimBus bus(console);
 
 // Input handling
 // --------------
-SimInput input(11, console);
+SimInput input(13, console);
 
 const int input_p1_right = 0;
 const int input_p1_left = 1;
@@ -78,6 +79,8 @@ const int input_p2_up = 7;
 const int input_coin = 8;
 const int input_start1 = 9;
 const int input_start2 = 10;
+const int input_fire1 = 11;
+const int input_fire2 = 12;
 
 // Video
 // -----
@@ -127,6 +130,10 @@ int game_mode = 1;
 #ifdef IS_HUSTLE
 std::string tracefilename = "hustle.tr";
 int game_mode = 2;
+#endif
+#ifdef IS_BLASTO
+//std::string tracefilename = "blasto.tr";
+int game_mode = 3;
 #endif
 
 // MAME debug log
@@ -447,6 +454,8 @@ int main(int argc, char** argv, char** env)
 	input.SetMapping(input_coin, DIK_5);
 	input.SetMapping(input_start1, DIK_1);
 	input.SetMapping(input_start2, DIK_2);
+	input.SetMapping(input_fire1, DIK_RCONTROL);
+	input.SetMapping(input_fire2, DIK_LCONTROL);
 #else
 	input.SetMapping(input_p1_up, SDL_SCANCODE_UP);
 	input.SetMapping(input_p1_right, SDL_SCANCODE_RIGHT);
@@ -459,6 +468,8 @@ int main(int argc, char** argv, char** env)
 	input.SetMapping(input_coin, SDL_SCANCODE_5);
 	input.SetMapping(input_start1, SDL_SCANCODE_1);
 	input.SetMapping(input_start2, SDL_SCANCODE_2);
+	input.SetMapping(input_fire1, SDL_SCANCODE_RCONTROL);
+	input.SetMapping(input_fire2, SDL_SCANCODE_LCONTROL);
 
 #endif
 
@@ -467,8 +478,8 @@ int main(int argc, char** argv, char** env)
 #ifdef IS_BLOCKADE
 	bus.QueueDownload("roms/blockade/316-0004.u2", 0);
 	bus.QueueDownload("roms/blockade/316-0003.u3", 0);
-	bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat Blockade ROMs for padding
-	bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat ROMs for padding
+	bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat ROMs for padding
 	bus.QueueDownload("roms/blockade/316-0002.u29", 0);
 	bus.QueueDownload("roms/blockade/316-0002.u29", 0); // Repeat PROMs for padding (256 bytes only)
 	bus.QueueDownload("roms/blockade/316-0001.u43", 0);
@@ -478,8 +489,8 @@ int main(int argc, char** argv, char** env)
 #ifdef IS_COMOTION
 	bus.QueueDownload("roms/comotion/316-07.u2", 0);
 	bus.QueueDownload("roms/comotion/316-08.u3", 0);
-	bus.QueueDownload("roms/comotion/316-09.u4", 0); // Repeat Blockade ROMs for padding
-	bus.QueueDownload("roms/comotion/316-10.u5", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/comotion/316-09.u4", 0);
+	bus.QueueDownload("roms/comotion/316-10.u5", 0);
 	bus.QueueDownload("roms/comotion/316-06.u43", 0);
 	bus.QueueDownload("roms/comotion/316-06.u43", 0); // Repeat PROMs for padding (256 bytes only)
 	bus.QueueDownload("roms/comotion/316-05.u29", 0);
@@ -489,14 +500,26 @@ int main(int argc, char** argv, char** env)
 #ifdef IS_HUSTLE
 	bus.QueueDownload("roms/hustle/3160016.u2", 0);
 	bus.QueueDownload("roms/hustle/3160017.u3", 0);
-	bus.QueueDownload("roms/hustle/3160018.u4", 0); // Repeat Blockade ROMs for padding
-	bus.QueueDownload("roms/hustle/3160019.u5", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/hustle/3160018.u4", 0);
+	bus.QueueDownload("roms/hustle/3160019.u5", 0);
 	bus.QueueDownload("roms/hustle/3160020.u29", 0);
 	bus.QueueDownload("roms/hustle/3160021.u43", 0);
 #endif
 
+#ifdef IS_BLASTO
+	bus.QueueDownload("roms/blasto/blasto.u2", 0);
+	bus.QueueDownload("roms/blasto/blasto.u3", 0);
+	bus.QueueDownload("roms/blasto/blasto.u4", 0); 
+	bus.QueueDownload("roms/blasto/blasto.u5", 0); 
+	bus.QueueDownload("roms/blasto/blasto.u29", 0);
+	bus.QueueDownload("roms/blasto/blasto.u43", 0);
+#endif
+
 	// Set game mode
 	top->emu__DOT__game_mode = game_mode;
+
+	// Set overlay
+	top->emu__DOT__overlay_type = 3;
 	
 
 	// Setup video output
@@ -639,7 +662,6 @@ int main(int argc, char** argv, char** env)
 #endif
 
 		video.UpdateTexture();
-
 
 		// Pass inputs to sim
 		top->inputs = 0;

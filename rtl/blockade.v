@@ -6,9 +6,7 @@ module blockade (
 	input [1:0] game_mode,
 
 	output ce_pix,
-	output r,
-	output g,
-	output b,
+	output video,
 	output vsync,
 	output hsync,
 	output vblank,
@@ -31,6 +29,7 @@ module blockade (
 localparam GAME_BLOCKADE = 0;
 localparam GAME_COMOTION = 1;
 localparam GAME_HUSTLE = 2;
+localparam GAME_BLASTO = 3;
 
 // CPU reset can come from reset signal or coin start signal
 wire RESET = reset || (game_mode != GAME_BLOCKADE && coin_start > 6'b0);
@@ -200,9 +199,7 @@ begin
 end
 
 // Set video output signals
-assign r = 1'b0;
-assign g = prom_data_out[prom_col];
-assign b = 1'b0;
+assign video = prom_data_out[prom_col];
 assign hsync = ~HSYNC_N;
 assign hblank = ~HBLANK_N;
 assign vblank = ~VBLANK_N;
@@ -326,11 +323,11 @@ assign audio_r = sound_out;
 ///// OUTPUT CONTROL
 
 // ENV Sound
-// wire u50_1 = ~(OUTP && ADDR[3]);
-// wire u50_2 = ~(OUTP && ADDR[2]);
+wire u50_1 = ~(OUTP && ADDR[3]);
+wire u50_2 = ~(OUTP && ADDR[2]);
 /* verilator lint_off UNOPTFLAT */
-// wire u50_3 = ~(u50_1 && u50_4);
-// wire u50_4 = ~(u50_2 && u50_3);
+wire u50_3 = ~(u50_1 && u50_4);
+wire u50_4 = ~(u50_2 && u50_3);
 /* verilator lint_on UNOPTFLAT */
 
 // OUTP1 - Coin latch
@@ -390,10 +387,10 @@ always @(posedge clk) begin
 //	if(coin_start>6'b0) $display("coin_start");
 
 	// end
-	// if(u50_4)
-	// begin
-	// 	$display("ENV");
-	// end
+	if(u50_4)
+	begin
+		$display("ENV");
+	end
 end
 
 

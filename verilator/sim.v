@@ -5,7 +5,7 @@ module emu(
 
 	input clk_sys /*verilator public_flat*/,
 	input reset/*verilator public_flat*/,
-	input [10:0]  inputs/*verilator public_flat*/,
+	input [12:0]  inputs/*verilator public_flat*/,
 
 	output [7:0] VGA_R/*verilator public_flat*/,
 	output [7:0] VGA_G/*verilator public_flat*/,
@@ -36,6 +36,7 @@ module emu(
 	localparam GAME_BLOCKADE = 0;
 	localparam GAME_COMOTION = 1;
 	localparam GAME_HUSTLE = 2;
+	localparam GAME_BLASTO = 3;
 	
 	reg [7:0] IN_1;
 	reg [7:0] IN_2;
@@ -61,6 +62,8 @@ module emu(
 	wire btn_coin = inputs[8];
 	wire btn_start1 = inputs[9];
 	wire btn_start2 = inputs[10];
+	wire btn_fire1 = inputs[11];
+	wire btn_fire2 = inputs[12];
 	wire btn_boom = 1'b0;
 
 	localparam blockade_dip_lives_6 = 3'b000;
@@ -68,22 +71,33 @@ module emu(
 	localparam blockade_dip_lives_4 = 3'b110;
 	localparam blockade_dip_lives_3 = 3'b011;
 
-	localparam comotion_dip_lives_4 = 1'b1;
-	localparam comotion_dip_lives_3 = 1'b0;
+	localparam comotion_dip_lives_4 = 1'b0;
+	localparam comotion_dip_lives_3 = 1'b1;
 
-	localparam hustle_dip_time_90 = 1'b1;
-	localparam hustle_dip_time_120 = 1'b0;
+	localparam hustle_dip_time_90 = 1'b0;
+	localparam hustle_dip_time_120 = 1'b1;
 
-	localparam hustle_dip_coin_4C1C = 2'd0;
-	localparam hustle_dip_coin_3C1C = 2'd1;
-	localparam hustle_dip_coin_2C1C = 2'd2;
-	localparam hustle_dip_coin_1C1C = 2'd3;
+	localparam hustle_dip_coin_4C1C = 2'd3;
+	localparam hustle_dip_coin_3C1C = 2'd2;
+	localparam hustle_dip_coin_2C1C = 2'd1;
+	localparam hustle_dip_coin_1C1C = 2'd0;
 
 	localparam hustle_dip_freegame_11000 = 8'b01110001;
 	localparam hustle_dip_freegame_13000 = 8'b10110001;
 	localparam hustle_dip_freegame_15000 = 8'b11010001;
 	localparam hustle_dip_freegame_17000 = 8'b11100001;
 	localparam hustle_dip_freegame_none = 8'b11110000;
+
+	localparam blasto_dip_time_90 = 1'b0;
+	localparam blasto_dip_time_70 = 1'b1;
+
+	localparam blasto_dip_demosounds_on = 1'b0;
+	localparam blasto_dip_demosounds_off = 1'b1;
+
+	localparam blasto_dip_coin_4C1C = 2'd3;
+	localparam blasto_dip_coin_3C1C = 2'd2;
+	localparam blasto_dip_coin_2C1C = 2'd1;
+	localparam blasto_dip_coin_1C1C = 2'd0;
 
 	// Setup hardware inputs for each game mode
 	always @(posedge clk_sys) begin
@@ -94,26 +108,47 @@ module emu(
 			IN_4 <= ~{8'b00000000}; // Unused
 		end
 		GAME_COMOTION: begin 
-			IN_1 <= ~{btn_coin, 2'b0, btn_start1||btn_start2, ~comotion_dip_lives_3, btn_boom, 2'b00}; // Coin + DIPS
+			IN_1 <= ~{btn_coin, 2'b0, btn_start1||btn_start2, comotion_dip_lives_3, btn_boom, 2'b00}; // Coin, Starts, DIPS
 			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
 			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p3_left, p3_down, p3_right, p3_up}; // P2 + P3 Controls
 		end
 		GAME_HUSTLE: begin 
-			IN_1 <= ~{btn_coin, 2'b0, btn_start2, btn_start1, ~hustle_dip_time_120, ~hustle_dip_coin_1C1C}; // Coin + DIPS
+			IN_1 <= ~{btn_coin, 2'b0, btn_start2, btn_start1, hustle_dip_time_120, hustle_dip_coin_1C1C}; // Coin, Starts, DIPS
 			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
-			IN_4 <= { hustle_dip_freegame_15000 }; // P2 + P3 Controls
+			IN_4 <= hustle_dip_freegame_15000; // Extra DIPS
+		end
+		GAME_BLASTO: begin 
+			IN_1 <= ~{btn_coin, 3'b0, blasto_dip_time_70, blasto_dip_demosounds_off, blasto_dip_coin_1C1C}; // Coin, Starts, DIPS
+			IN_2 <= ~{btn_fire1, btn_start2, btn_start1, 4'b0000, btn_fire2}; 
+			IN_4 <= ~{p1_up, p1_left, p1_down, p1_right, p2_up, p2_left, p2_down, p2_right}; // P1 + P2 Controls
 		end
 		endcase
 	end
 
-	reg RED;
-	reg GREEN;
-	reg BLUE;
+	reg [1:0] overlay_type /*verilator public_flat*/;
+	reg [2:0] overlay_mask;
+	// - Overlay 0 = B/W
+	// - Overlay 1 = Green
+	// - Overlay 2 = Yellow
+	// - Overlay 4 = Red
+	wire video;
 
-	// Convert output to 8bpp
-	assign VGA_R = {8{RED}};
-	assign VGA_G = {8{GREEN}};
-	assign VGA_B = {8{BLUE}};
+	always @(posedge clk_sys) begin
+		// Generate overlay colour mask
+		case(overlay_type)
+		2'd0: overlay_mask <= 3'b010; // Green
+		2'd1: overlay_mask <= 3'b111; // White
+		2'd2: overlay_mask <= 3'b011; // Yellow
+		2'd3: overlay_mask <= 3'b001; // Red
+		endcase
+	end
+	wire [2:0] video_rgb = {3{video}} & overlay_mask;
+	wire [23:0] rgb = {{8{video_rgb[0]}},{8{video_rgb[1]}},{8{video_rgb[2]}}};
+
+	// Apply selected mask and convert to 8bpp RGB
+	assign VGA_R = {8{video_rgb[0]}};
+	assign VGA_G = {8{video_rgb[1]}};
+	assign VGA_B = {8{video_rgb[2]}};
 
 	// Audio
 	wire [15:0] audio_l;
@@ -126,9 +161,7 @@ module emu(
 		.reset(reset || ioctl_download),
 		.game_mode(game_mode),
 		.ce_pix(ce_pix),
-		.r(RED),
-		.g(GREEN),
-		.b(BLUE),
+		.video(video),
 		.in_1(IN_1),
 		.in_2(IN_2),
 		.in_4(IN_4),

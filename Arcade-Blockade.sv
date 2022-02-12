@@ -210,8 +210,8 @@ localparam CONF_STR = {
 	"DIP;",
 	"-;",
 	"R0,Reset;",
-	"J1,Coin,Start;",
-	"Jn,Coin,Start;",
+	"J1,Coin,Start,Fire;",
+	"Jn,Select,Start,A;",
 	"V,v",`BUILD_DATE
 };
 
@@ -296,33 +296,76 @@ wire btn_coin = joystick_0[4] || joystick_1[4] || joystick_2[4] || joystick_3[4]
 wire btn_start = joystick_0[5] || joystick_1[5] || joystick_2[5] || joystick_3[5];
 wire btn_start1 = joystick_0[5];
 wire btn_start2 = joystick_1[5];
+wire btn_fire1 = joystick_0[6];
+wire btn_fire2 = joystick_1[6];
 
 wire btn_boom = 1'b0;
 
 ///////////////////   DIPS   ////////////////////
+
+reg [2:0] dip_blockade_lives;
+reg dip_comotion_lives;
+reg [1:0] dip_hustle_coin;
+reg [7:0] dip_hustle_freegame;
+reg dip_hustle_time;
+reg [1:0] dip_blasto_coin;
+reg dip_blasto_demosounds;
+reg dip_blasto_time;
+reg [1:0] overlay_type;
+reg [2:0] overlay_mask;
+
 reg [7:0] sw[8];
-always @(posedge clk_sys) if (ioctl_wr && (ioctl_index==254) && !ioctl_addr[24:3]) sw[ioctl_addr[2:0]] <= ioctl_dout;
+always @(posedge clk_sys)
+begin
+	if (ioctl_wr && (ioctl_index==8'd254) && !ioctl_addr[24:3]) sw[ioctl_addr[2:0]] <= ioctl_dout;
 
-// DIPs behave strangely in Blockade, so they are remapped here
-wire [2:0] dip_blockade_lives =	sw[0][1:0] == 2'd0 ?	3'b011 : // 3 lives
-								sw[0][1:0] == 2'd1 ? 	3'b110 : // 4 lives
-								sw[0][1:0] == 2'd2 ?	3'b100 : // 5 lives
-														3'b000;  // 6 lives
-wire dip_comotion_lives = sw[0][0];
+ 	case(game_mode)
+	GAME_BLOCKADE:
+	begin
+		// The lives DIP behaves strangely in Blockade, so it is remapped here
+		case(sw[0][1:0])
+		2'd0: dip_blockade_lives <= 3'b011; // 3 lives
+		2'd1: dip_blockade_lives <= 3'b110; // 4 lives
+		2'd2: dip_blockade_lives <= 3'b100; // 5 lives
+		2'd3: dip_blockade_lives <= 3'b000; // 6 lives
+		endcase
+		overlay_type <= sw[0][3:2];
+	end
+	GAME_COMOTION:
+	begin
+		dip_comotion_lives <= sw[0][0];
+		overlay_type <= sw[0][2:1];
+	end
+	GAME_HUSTLE:
+	begin
+		dip_hustle_coin <= sw[0][1:0];
+		case(sw[0][3:2])
+		2'd0: dip_hustle_freegame <= 8'b11100001;
+		2'd1: dip_hustle_freegame <= 8'b11010001;
+		2'd2: dip_hustle_freegame <= 8'b10110001;
+		2'd3: dip_hustle_freegame <= 8'b01110001;
+		endcase
+		dip_hustle_time <= sw[0][4];
+		overlay_type <= sw[0][6:5];
+	end
+	GAME_BLASTO:
+	begin
+		dip_blasto_coin = sw[0][1:0];
+		dip_blasto_demosounds = sw[0][2];
+		dip_blasto_time = sw[0][3];
+		overlay_type <= sw[0][5:4];
+	end
+	endcase
 
-wire [1:0] dip_hustle_coin = sw[0][1:0];
-wire dip_hustle_time = sw[0][5];
+	// Generate overlay colour mask
+	case(overlay_type)
+	2'd0: overlay_mask <= 3'b010; // Green
+	2'd1: overlay_mask <= 3'b111; // White
+	2'd2: overlay_mask <= 3'b011; // Yellow
+	2'd3: overlay_mask <= 3'b001; // Red
+	endcase
 
-localparam hustle_dip_freegame_11000 = 8'b01110001;
-localparam hustle_dip_freegame_13000 = 8'b10110001;
-localparam hustle_dip_freegame_15000 = 8'b11010001;
-localparam hustle_dip_freegame_17000 = 8'b11100001;
-localparam hustle_dip_freegame_none = 8'b11110000;
-wire [7:0] dip_hustle_freegame =	sw[0][4:2] == 3'd1 ?	hustle_dip_freegame_11000 :
-									sw[0][4:2] == 3'd1 ?	hustle_dip_freegame_13000 :
-									sw[0][4:2] == 3'd1 ?	hustle_dip_freegame_15000 :
-									sw[0][4:2] == 3'd1 ?	hustle_dip_freegame_15000 :
-															hustle_dip_freegame_none;
+end
 
 ///////////////////   INPUTS   ////////////////////
 
@@ -330,13 +373,14 @@ reg [1:0] game_mode /*verilator public_flat*/;
 localparam GAME_BLOCKADE = 0;
 localparam GAME_COMOTION = 1;
 localparam GAME_HUSTLE = 2;
+localparam GAME_BLASTO = 3;
 reg [7:0] IN_1;
 reg [7:0] IN_2;
 reg [7:0] IN_4;
 always @(posedge clk_sys) 
 begin
 	// Set game mode
-	if (ioctl_wr & (ioctl_index==1)) game_mode <= ioctl_dout[1:0];
+	if (ioctl_wr && (ioctl_index==8'd1)) game_mode <= ioctl_dout[1:0];
 
 	// Game specific inputs
 	case (game_mode)
@@ -355,14 +399,19 @@ begin
 			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
 			IN_4 <= dip_hustle_freegame; // Extra DIPS
 		end
+		GAME_BLASTO: begin 
+			IN_1 <= ~{btn_coin, 3'b0, dip_blasto_time, dip_blasto_demosounds, dip_blasto_coin}; // Coin, Starts, DIPS
+			IN_2 <= ~{btn_fire1, btn_start2, btn_start1, 4'b0000, btn_fire2}; 
+			IN_4 <= ~{p1_up, p1_left, p1_down, p1_right, p2_up, p2_left, p2_down, p2_right}; // P1 + P2 Controls
+		end
 	endcase
 end
 
 ///////////////////   VIDEO   ////////////////////
 reg ce_pix;
 wire hblank, vblank, hs, vs, hs_original, vs_original;
-wire r, g, b;
-wire [23:0] rgb = {{8{r}},{8{g}},{8{b}}};
+wire [2:0] video_rgb = {3{video}} & overlay_mask;
+wire [23:0] rgb = {{8{video_rgb[0]}},{8{video_rgb[1]}},{8{video_rgb[2]}}};
 
 arcade_video #(256,24) arcade_video
 (
@@ -401,9 +450,8 @@ assign LED_USER = rom_download;
 blockade blockade (
 	.clk(clk_sys),
 	.reset(reset),
-	.r(r),
-	.g(g),
-	.b(b),
+	.game_mode(game_mode),
+	.video(video),
 	.ce_pix(ce_pix),
 	.in_1(IN_1),
 	.in_2(IN_2),

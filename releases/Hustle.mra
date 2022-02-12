@@ -1,25 +1,27 @@
 <misterromdescription>
 	<name>Hustle</name>
+	<year>1977</year>
+	<manufacturer>Gremlin</manufacturer>
 
 	<setname>hustle</setname>
 	<mameversion>0225</mameversion>
-	<rbf>Blockade</rbf>
+	<rbf>blockade</rbf>
 
 	<buttons default="Select,Start" names="Coin,Start"></buttons>
-	<switches default="00">
+	<switches default="20">
 		<dip bits="0,1" ids="4 coins / 1 credit,3 coins / 1 credit,2 coins / 1 credit,1 coins / 1 credit" name="Coinage" values="3,2,1,0"></dip>
-		<dip bits="4,3,2" ids="11000,13000,15000,17000,Disabled,-,-,-" name="Free Game" values="1,2,3,4,0,-,-,-"></dip>
-		<dip bits="5" ids="1 min, 1.5 mins" name="Game Time" values="0,1"></dip>
+		<dip bits="2,3" ids="11000,13000,15000,17000" name="Free Game" values="3,2,1,0"></dip>
+		<dip bits="4" ids="2 mins,1.5 mins" name="Game Time" values="0,1"></dip>
+		<dip bits="5,6" ids="Green,White,Yellow,Red" name="Overlay Colour" values="0,1,2,3"></dip>
 	</switches>
 
-	<rom index="1"><part>2</part></rom>
+	<rom index="1"><part>02</part></rom>
 	<rom index="0" md5="none" zip="hustle.zip">
 		<!-- GAME ROMS -->
 		<part crc="none" name="3160016.u2"/>
 		<part crc="none" name="3160017.u3"/>
 		<part crc="none" name="3160018.u4"/>
 		<part crc="none" name="3160019.u5"/>
-
 		<!-- GFX PROMS -->
 		<part crc="none" name="3160020.u29"/>
 		<part crc="none" name="3160021.u43"/>
