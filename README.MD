@@ -1,18 +1,26 @@
 # Blockade by Sega/Gremlin Industries for [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
 
-An FPGA implementation of Blockade arcade hardware for the MiSTer platform
+An FPGA implementation of Gremlin Industries Blockade arcade hardware for the MiSTer platform
 
 ## Credits
 - JimmyStones: Core design and implementation
+- Vslav (1801BM1): vm80a (https://github.com/1801BM1/vm80a) CPU module - an 8080A implementation reverse engineered from a Soviet replica!
 - Jotego: JTFRAME/jtframe_resync module for analog video H/V re-positioning
 
-## Features
-- Modelled using original schematics, logic has been simplified to reduce complexity
-- Uses vm80a (https://github.com/1801BM1/vm80a) by Vslav (1801BM1) - an 8080A implementation reverse engineered from a Soviet replica!
+## Implementation details
+- Built in simulation using original schematics and information from MAME, logic has been simplified where possible
+- Supports all Gremlin produced games based on the Blockade hardware
+- Monochrome video output with selectable colour overlay (Green,White,Yellow,Red)
 
 ## Supported games
-- 
-- 
+- Blockade (1976)
+- CoMotion (1977)
+- Hustle (1977)
+- Blasto (1978)
+
+## Known issues
+- Sound is imperfect
+- Free game on Hustle cannot be disabled in DIPs
 
 ## Installation
 Place `*.rbf` into the "_Arcade/cores" folder on your SD card.  Then, place `*.mra` into the "_Arcade" folder and ROM files from MAME into "games/mame".
@@ -30,6 +38,3 @@ Quick reference for folders and file placement:
 /_Arcade/cores/<game rbf>.rbf
 /games/mame/<mame rom>.zip
 /games/hbmame/<hbmame rom>.zip
-
-## Known Issues
-1) No sound!
