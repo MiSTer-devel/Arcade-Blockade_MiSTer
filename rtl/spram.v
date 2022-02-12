@@ -42,17 +42,6 @@ module spram # (
 		if (init_file>0) $readmemh(init_file, mem);
 	end
 
-`ifdef SIMULATION
-	integer    j;
-	initial
-	begin
-		for (j = 0; j < ramLength; j = j + 1)
-		begin
-			mem[j] = 0;
-		end
-	end
-`endif
-
 	always @(posedge clk)
 	begin
 		if (wren)

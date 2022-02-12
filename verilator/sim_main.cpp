@@ -593,24 +593,26 @@ int main(int argc, char** argv, char** env)
 		ImGui::SetWindowPos(windowTitle_DebugLog, ImVec2(0, 160), ImGuiCond_Once);
 
 		// Memory debug
-		ImGui::Begin("ROM1 MSB");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom1_msb__DOT__mem, 1024, 0);
-		ImGui::End();
-		ImGui::Begin("ROM1 LSB");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom1_lsb__DOT__mem, 1024, 0);
-		ImGui::End();
-		ImGui::Begin("ROM2 MSB");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom2_msb__DOT__mem, 1024, 0);
-		ImGui::End();
-		ImGui::Begin("ROM2 LSB");
-		mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom2_lsb__DOT__mem, 1024, 0);
-		ImGui::End();
-
+		//ImGui::Begin("ROM1 MSB");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom1_msb__DOT__mem, 1024, 0);
+		//ImGui::End();
+		//ImGui::Begin("ROM1 LSB");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom1_lsb__DOT__mem, 1024, 0);
+		//ImGui::End();
+		//ImGui::Begin("ROM2 MSB");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom2_msb__DOT__mem, 1024, 0);
+		//ImGui::End();
+		//ImGui::Begin("ROM2 LSB");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__rom2_lsb__DOT__mem, 1024, 0);
+		//ImGui::End();
 		//ImGui::Begin("PROM MSB");
 		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__prom_msb__DOT__mem, 256, 0);
 		//ImGui::End();
 		//ImGui::Begin("PROM LSB");
 		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__prom_lsb__DOT__mem, 256, 0);
+		//ImGui::End();
+		//ImGui::Begin("SOUND");
+		//mem_edit.DrawContents(&top->emu__DOT__blockade__DOT__sound_rom__DOT__mem, 64000, 0);
 		//ImGui::End();
 		int windowX = 550;
 		int windowWidth = (VGA_WIDTH * VGA_SCALE_X) + 24;

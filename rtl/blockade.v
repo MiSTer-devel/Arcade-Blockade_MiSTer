@@ -315,9 +315,52 @@ blockade_lpf lpf
 	.in(sound_out),
 	.out(sound_filtered)
 );
-// Invert the 
-assign audio_l = 16'hFFFF - sound_filtered;
-assign audio_r = sound_out;
+
+// WAV PLAYER
+reg wav_playing = 1'b0;
+reg wav_play = 1'b0;
+reg [WAV_COUNTER_SIZE-1:0] wav_counter;
+localparam WAV_COUNTER_SIZE = 9;
+reg signed [8:0] wav_out;
+always @(posedge clk)
+begin
+	if(!wav_playing)
+	begin
+		if(wav_play)
+		begin
+			wav_playing <= 1'b1;
+			wav_play <= 1'b0;
+			sound_rom_addr <= 16'b0;
+			wav_counter <= {WAV_COUNTER_SIZE{1'b1}};
+		end
+	end
+	else
+	begin
+		wav_counter <= wav_counter - 1'b1;
+		if(wav_counter == {WAV_COUNTER_SIZE{1'b0}})
+		begin
+			$display("WAV: %d %d %d", sound_rom_addr, sound_rom_data_out, wav_out);
+			if(sound_rom_addr < sound_rom_length)
+			begin
+				wav_out <= {1'b0, sound_rom_data_out } - $signed(9'd128);
+				sound_rom_addr <= sound_rom_addr + 16'b1;
+				wav_counter <= {WAV_COUNTER_SIZE{1'b1}};
+			end
+			else
+			begin
+				wav_out <= 9'b0;
+				sound_rom_addr <= 16'b0;
+				wav_playing <= 1'b0;
+			end
+		end
+	end
+end
+
+
+//assign audio_l = 16'hFFFF - sound_filtered;
+assign audio_l = { wav_out, 7'b0 };
+//assign audio_l = 16'hFFFF - sound_filtered;
+//assign audio_r = { 1'b0, wav_out, 7'b0 };
 
 
 ///// OUTPUT CONTROL
@@ -389,7 +432,7 @@ always @(posedge clk) begin
 	// end
 	if(u50_4)
 	begin
-		$display("ENV");
+		wav_play <= 1'b1;
 	end
 end
 
@@ -577,6 +620,7 @@ dpram #(9,4) prom_lsb
 
 reg [15:0] sound_rom_addr;
 wire [7:0] sound_rom_data_out;
+reg [15:0] sound_rom_length = 16'd38174;
 // Sound samples
 spram #(16,8, "sound.hex") sound_rom
 (
