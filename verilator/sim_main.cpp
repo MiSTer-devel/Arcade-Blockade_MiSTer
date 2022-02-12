@@ -42,7 +42,8 @@ bool multi_step = 0;
 int multi_step_amount = 1024;
 
 //#define IS_BLOCKADE
-#define IS_COMOTION
+//#define IS_COMOTION
+#define IS_HUSTLE
 
 
 // Debug GUI 
@@ -62,7 +63,7 @@ SimBus bus(console);
 
 // Input handling
 // --------------
-SimInput input(12, console);
+SimInput input(11, console);
 
 const int input_p1_right = 0;
 const int input_p1_left = 1;
@@ -75,7 +76,8 @@ const int input_p2_down = 6;
 const int input_p2_up = 7;
 
 const int input_coin = 8;
-const int input_start = 9;
+const int input_start1 = 9;
+const int input_start2 = 10;
 
 // Video
 // -----
@@ -121,6 +123,10 @@ int game_mode = 0;
 #ifdef IS_COMOTION 
 std::string tracefilename = "comotion.tr";
 int game_mode = 1;
+#endif
+#ifdef IS_HUSTLE
+std::string tracefilename = "hustle.tr";
+int game_mode = 2;
 #endif
 
 // MAME debug log
@@ -439,19 +445,21 @@ int main(int argc, char** argv, char** env)
 	input.SetMapping(input_p2_down, DIK_S);
 	input.SetMapping(input_p2_left, DIK_A);
 	input.SetMapping(input_coin, DIK_5);
-	input.SetMapping(input_start, DIK_1);
+	input.SetMapping(input_start1, DIK_1);
+	input.SetMapping(input_start2, DIK_2);
 #else
-	input.SetMapping(input_up, SDL_SCANCODE_UP);
-	input.SetMapping(input_right, SDL_SCANCODE_RIGHT);
-	input.SetMapping(input_down, SDL_SCANCODE_DOWN);
-	input.SetMapping(input_left, SDL_SCANCODE_LEFT);
-	input.SetMapping(input_fire1, SDL_SCANCODE_SPACE);
-	input.SetMapping(input_start_1, SDL_SCANCODE_1);
-	input.SetMapping(input_start_2, SDL_SCANCODE_2);
-	input.SetMapping(input_coin_1, SDL_SCANCODE_3);
-	input.SetMapping(input_coin_2, SDL_SCANCODE_4);
-	input.SetMapping(input_coin_3, SDL_SCANCODE_5);
-	input.SetMapping(input_pause, SDL_SCANCODE_P);
+	input.SetMapping(input_p1_up, SDL_SCANCODE_UP);
+	input.SetMapping(input_p1_right, SDL_SCANCODE_RIGHT);
+	input.SetMapping(input_p1_down, SDL_SCANCODE_DOWN);
+	input.SetMapping(input_p1_left, SDL_SCANCODE_LEFT);
+	input.SetMapping(input_p2_up, SDL_SCANCODE_W);
+	input.SetMapping(input_p2_right, SDL_SCANCODE_D);
+	input.SetMapping(input_p2_down, SDL_SCANCODE_S);
+	input.SetMapping(input_p2_left, SDL_SCANCODE_A);
+	input.SetMapping(input_coin, SDL_SCANCODE_5);
+	input.SetMapping(input_start1, SDL_SCANCODE_1);
+	input.SetMapping(input_start2, SDL_SCANCODE_2);
+
 #endif
 
 	// Stage ROMs
@@ -462,7 +470,9 @@ int main(int argc, char** argv, char** env)
 	bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat Blockade ROMs for padding
 	bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat Blockade ROMs for padding
 	bus.QueueDownload("roms/blockade/316-0002.u29", 0);
+	bus.QueueDownload("roms/blockade/316-0002.u29", 0); // Repeat PROMs for padding (256 bytes only)
 	bus.QueueDownload("roms/blockade/316-0001.u43", 0);
+	bus.QueueDownload("roms/blockade/316-0001.u43", 0); // Repeat PROMs for padding (256 bytes only)
 #endif
 
 #ifdef IS_COMOTION
@@ -471,7 +481,18 @@ int main(int argc, char** argv, char** env)
 	bus.QueueDownload("roms/comotion/316-09.u4", 0); // Repeat Blockade ROMs for padding
 	bus.QueueDownload("roms/comotion/316-10.u5", 0); // Repeat Blockade ROMs for padding
 	bus.QueueDownload("roms/comotion/316-06.u43", 0);
+	bus.QueueDownload("roms/comotion/316-06.u43", 0); // Repeat PROMs for padding (256 bytes only)
 	bus.QueueDownload("roms/comotion/316-05.u29", 0);
+	bus.QueueDownload("roms/comotion/316-05.u29", 0); // Repeat PROMs for padding (256 bytes only)
+#endif
+
+#ifdef IS_HUSTLE
+	bus.QueueDownload("roms/hustle/3160016.u2", 0);
+	bus.QueueDownload("roms/hustle/3160017.u3", 0);
+	bus.QueueDownload("roms/hustle/3160018.u4", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/hustle/3160019.u5", 0); // Repeat Blockade ROMs for padding
+	bus.QueueDownload("roms/hustle/3160020.u29", 0);
+	bus.QueueDownload("roms/hustle/3160021.u43", 0);
 #endif
 
 	// Set game mode

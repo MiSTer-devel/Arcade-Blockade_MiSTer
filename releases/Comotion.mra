@@ -5,22 +5,26 @@
 	<mameversion>0225</mameversion>
 	<rbf>Blockade</rbf>
 
-	<buttons default="Start" names="Start"></buttons>
+	<buttons default="Select,Start" names="Coin,Start"></buttons>
 	<switches default="00">
-		<dip bits="0,1" ids="3,4,5,6" name="Lives" values="0,1,2,3"></dip>
+		<dip bits="0" ids="3,4" name="Lives" values="1,0"></dip>
 	</switches>
 
-	<rom index="1">1</rom>
+	<rom index="1"><part>1</part></rom>
 	<rom index="0" md5="none" zip="comotion.zip">
 		<!-- GAME ROMS -->
-		<part crc="none" name="316-0007.u2"/>
-		<part crc="none" name="316-0008.u3"/>
-		<part crc="none" name="316-0009.u4"/>
-		<part crc="none" name="316-0010.u5"/>
-
-		<!-- GFX PROMS -->
-		<part crc="none" name="316-0006.u43"/>
-		<part crc="none" name="316-0005.u29"/>
+		<part crc="none" name="316-07.u2"/>
+		<part crc="none" name="316-08.u3"/>
+		<part crc="none" name="316-09.u4"/>
+		<part crc="none" name="316-10.u5"/>
+		<!-- GFX PROM 1 -->
+		<part crc="none" name="316-06.u43"/>
+		<!-- PADDING -->
+		<part repeat="256">00</part>
+		<!-- GFX PROM 1 -->
+		<part crc="none" name="316-05.u29"/>
+		<!-- PADDING -->
+		<part repeat="256">00</part>
 	</rom>
 	<rom index="2"></rom>
 	<rom index="3"></rom>

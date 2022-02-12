@@ -30,9 +30,10 @@ module blockade (
 // Game mode constants
 localparam GAME_BLOCKADE = 0;
 localparam GAME_COMOTION = 1;
+localparam GAME_HUSTLE = 2;
 
 // CPU reset can come from reset signal or coin start signal
-wire RESET = reset || (game_mode == GAME_COMOTION && coin_start > 6'b0);
+wire RESET = reset || (game_mode != GAME_BLOCKADE && coin_start > 6'b0);
 
 // Generate video and CPU enables
 // - Replaces U31, U17, U8, U18 section of circuit
@@ -78,24 +79,17 @@ end
 wire rom1_cs = (!ADDR[15] && !ADDR[11] && !ADDR[10] && MEMR);
 wire rom2_cs = (!ADDR[15] && !ADDR[11] && ADDR[10] && MEMR);
 
-// Input data selector
-reg [7:0] IN_1;
-reg [7:0] IN_2;
-reg [7:0] IN_4;
-always @(posedge clk) begin
-	IN_1 <= in_1;
-	IN_2 <= in_2;
-	IN_4 <= in_4;
-	case(game_mode)
-	GAME_BLOCKADE: IN_1[7] <= coin_latch;
-	GAME_COMOTION: IN_1[7] <= coin_latch;
-	endcase
+localparam COIN_LATCH_WIDTH = 6;
 
-	if(INP && ADDR[0])
-	begin
-		$display("INP: IN_1=%b IN_2=%b IN_4=%b", ADDR[0], ADDR[1], ADDR[2]);
-	end
-end
+// Input data selector
+wire [7:0] IN_1 = { ~(coin_latch > {COIN_LATCH_WIDTH{1'b0}}), in_1[6:0] };
+wire [7:0] IN_2 = in_2;
+wire [7:0] IN_4 = in_4;
+
+wire INP_1 = INP && ADDR[0];
+wire INP_2 = INP && ADDR[1];
+wire INP_4 = INP && ADDR[2];
+
 wire [7:0] inp_data_out =	ADDR[0] ? IN_1 : // IN_1
 							ADDR[1] ? IN_2 : // IN_2
 							ADDR[2] ? IN_4 : // IN_4 - Not connected in Blockade
@@ -331,11 +325,12 @@ assign audio_r = sound_out;
 
 ///// OUTPUT CONTROL
 
-wire u50_1 = ~(OUTP && ADDR[3]);
-wire u50_2 = ~(OUTP && ADDR[2]);
+// ENV Sound
+// wire u50_1 = ~(OUTP && ADDR[3]);
+// wire u50_2 = ~(OUTP && ADDR[2]);
 /* verilator lint_off UNOPTFLAT */
-wire u50_3 = ~(u50_1 && u50_4);
-wire u50_4 = ~(u50_2 && u50_3);
+// wire u50_3 = ~(u50_1 && u50_4);
+// wire u50_4 = ~(u50_2 && u50_3);
 /* verilator lint_on UNOPTFLAT */
 
 // OUTP1 - Coin latch
@@ -344,11 +339,35 @@ wire OUTP2 = OUTP && ADDR[1];
 reg u14_3qn;
 reg coin_last;
 reg [5:0] coin_start;
-reg coin_latch;
+reg coin_inserted;
+reg [COIN_LATCH_WIDTH-1:0] coin_latch;
 
 always @(posedge clk) begin
+	if(INP_1)
+	begin
+		if(coin_inserted)
+		begin
+			//$display("INP1 - coin_inserted");
+			// if(DATA[7])
+			// begin
+			//	$display("Coin latch on");
+				coin_latch <= {COIN_LATCH_WIDTH{1'b1}};
+				coin_inserted <= 1'b0;
+			// end
+		end
+		if(coin_latch > {COIN_LATCH_WIDTH{1'b0}})
+		begin
+			coin_latch <= coin_latch - {{COIN_LATCH_WIDTH-1{1'b0}},1'b1};
+			//if(coin_latch == {{COIN_LATCH_WIDTH-1{1'b0}},1'b1}) $display("Coin latch off");
+		end
+		//$display("INP1: IN_1=%b  coin_in:%d  coin_l:%d", IN_1, coin_inserted, coin_latch);
+	end
 
-	if(reset) coin_latch <= 1'b1;
+	if(reset)
+	begin
+		coin_latch <= {COIN_LATCH_WIDTH{1'b0}};
+		coin_inserted <= 1'b0;
+	end
 
 	if(coin_start > 6'b0) coin_start <= coin_start - 6'b1;
 	
@@ -356,24 +375,19 @@ always @(posedge clk) begin
 
 	if(OUTP1)
 	begin
-		$display("OUTP1 %b", ~DATA[7]);
+//		$display("OUTP: IN_1=%b IN_2=%b IN_4=%b coin_in:%d  coin_l:%d", ADDR[0], ADDR[1], ADDR[2], coin_inserted, coin_latch);
 		u14_3qn <= ~DATA[7];
 	end
 	
-	if(u14_3qn)
-	begin
-		//if(!coin_latch) $display("u14_3qn coin_latch = 0");
-		//coin_latch <= 1'b1;
-	end
-
 	coin_last <= coin;
 	if(coin && !coin_last)
 	begin
-		// $display("u14_3qn coin_latch = 1");
-		$display("coin pulse started");
-		coin_latch <= ~coin_latch;
-		if(coin_latch) coin_start <= 6'b1;
+//		$display("COIN: IN_1=%b IN_2=%b IN_4=%b coin_in:%d  coin_l:%d", ADDR[0], ADDR[1], ADDR[2], coin_inserted, coin_latch);
+		coin_inserted <= 1'b1;
+		coin_start <= 6'b111111;
 	end
+
+//	if(coin_start>6'b0) $display("coin_start");
 
 	// end
 	// if(u50_4)
@@ -524,15 +538,18 @@ wire [3:0] prom_data_out_lsb;
 wire [3:0] prom_data_out_msb;
 wire [7:0] prom_data_out = { prom_data_out_msb, prom_data_out_lsb } ;
 
+localparam PROM_SIZE = 9;
 // Graphics PROM read adress
-wire [7:0] prom_addr = { vram_data_out[4:0], vcnt[2:0] };
+wire [PROM_SIZE-1:0] prom_addr = { vram_data_out[5:0], vcnt[2:0] };
+//wire [8:0] prom_addr = { 1'b0, vram_data_out[4:0], vcnt[2:0] };
 
 // Graphics ROM download write enables
-wire prom_msb_wr = dn_addr[12:8] == 5'b10000 && dn_wr;
-wire prom_lsb_wr = dn_addr[12:8] == 5'b10001 && dn_wr;
+wire prom_msb_wr = dn_addr[12:9] == 4'b1000 && dn_wr;
+wire prom_lsb_wr = dn_addr[12:9] == 4'b1001 && dn_wr;
+
 
 // Graphics PROM - U29 - Most-significant bits
-dpram #(8,4) prom_msb
+dpram #(PROM_SIZE,4) prom_msb
 (
 	.clock_a(clk),
 	.address_a(prom_addr),
@@ -541,13 +558,13 @@ dpram #(8,4) prom_msb
 	.q_a(prom_data_out_msb),
 
 	.clock_b(clk),
-	.address_b(dn_addr[7:0]),
+	.address_b(dn_addr[PROM_SIZE-1:0]),
 	.wren_b(prom_msb_wr),
 	.data_b(dn_data[3:0]),
 	.q_b()
 );
 // Graphics ROM - U43 - Least-significant bits
-dpram #(8,4) prom_lsb
+dpram #(PROM_SIZE,4) prom_lsb
 (
 	.clock_a(clk),
 	.address_a(prom_addr),
@@ -556,7 +573,7 @@ dpram #(8,4) prom_lsb
 	.q_a(prom_data_out_lsb),
 
 	.clock_b(clk),
-	.address_b(dn_addr[7:0]),
+	.address_b(dn_addr[PROM_SIZE-1:0]),
 	.wren_b(prom_lsb_wr),
 	.data_b(dn_data[3:0]),
 	.q_b()

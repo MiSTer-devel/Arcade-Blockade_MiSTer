@@ -210,8 +210,8 @@ localparam CONF_STR = {
 	"DIP;",
 	"-;",
 	"R0,Reset;",
-	"J1,Coin;",
-	"Jn,Start;",
+	"J1,Coin,Start;",
+	"Jn,Coin,Start;",
 	"V,v",`BUILD_DATE
 };
 
@@ -243,7 +243,7 @@ wire  [7:0] ioctl_din;
 wire  [7:0] ioctl_index;
 wire        ioctl_wait;
 
-wire [15:0] joystick_0, joystick_1;
+wire [15:0] joystick_0, joystick_1, joystick_2, joystick_3;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -269,18 +269,11 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_wait(ioctl_wait),
 
 	.joystick_0(joystick_0),
-	.joystick_1(joystick_1)
+	.joystick_1(joystick_1),
+	.joystick_2(joystick_2),
+	.joystick_3(joystick_3)
 );
 
-///////////////////   DIPS   ////////////////////
-reg [7:0] sw[8];
-always @(posedge clk_sys) if (ioctl_wr && (ioctl_index==254) && !ioctl_addr[24:3]) sw[ioctl_addr[2:0]] <= ioctl_dout;
-
-// DIPs behave strangely in Blockade, so they are remapped here
-wire [2:0] dip_lives =  sw[0][1:0] == 2'd0 ?  3'b011 : // 3 lives
-						sw[0][1:0] == 2'd1 ?  3'b110 : // 4 lives
-						sw[0][1:0] == 2'd2 ?  3'b100 : // 5 lives
-											  3'b000;   // 6 lives
 
 ///////////////////   CONTROLS   ////////////////////
 wire p1_right = joystick_0[0];
@@ -291,13 +284,79 @@ wire p2_right = joystick_1[0];
 wire p2_left = joystick_1[1];
 wire p2_down = joystick_1[2];
 wire p2_up = joystick_1[3];
-wire btn_coin = joystick_0[4] || joystick_1[4];
+wire p3_right = joystick_2[0];
+wire p3_left = joystick_2[1];
+wire p3_down = joystick_2[2];
+wire p3_up = joystick_2[3];
+wire p4_right = joystick_3[0];
+wire p4_left = joystick_3[1];
+wire p4_down = joystick_3[2];
+wire p4_up = joystick_3[3];
+wire btn_coin = joystick_0[4] || joystick_1[4] || joystick_2[4] || joystick_3[4];
+wire btn_start = joystick_0[5] || joystick_1[5] || joystick_2[5] || joystick_3[5];
+wire btn_start1 = joystick_0[5];
+wire btn_start2 = joystick_1[5];
+
 wire btn_boom = 1'b0;
 
+///////////////////   DIPS   ////////////////////
+reg [7:0] sw[8];
+always @(posedge clk_sys) if (ioctl_wr && (ioctl_index==254) && !ioctl_addr[24:3]) sw[ioctl_addr[2:0]] <= ioctl_dout;
+
+// DIPs behave strangely in Blockade, so they are remapped here
+wire [2:0] dip_blockade_lives =	sw[0][1:0] == 2'd0 ?	3'b011 : // 3 lives
+								sw[0][1:0] == 2'd1 ? 	3'b110 : // 4 lives
+								sw[0][1:0] == 2'd2 ?	3'b100 : // 5 lives
+														3'b000;  // 6 lives
+wire dip_comotion_lives = sw[0][0];
+
+wire [1:0] dip_hustle_coin = sw[0][1:0];
+wire dip_hustle_time = sw[0][5];
+
+localparam hustle_dip_freegame_11000 = 8'b01110001;
+localparam hustle_dip_freegame_13000 = 8'b10110001;
+localparam hustle_dip_freegame_15000 = 8'b11010001;
+localparam hustle_dip_freegame_17000 = 8'b11100001;
+localparam hustle_dip_freegame_none = 8'b11110000;
+wire [7:0] dip_hustle_freegame =	sw[0][4:2] == 3'd1 ?	hustle_dip_freegame_11000 :
+									sw[0][4:2] == 3'd1 ?	hustle_dip_freegame_13000 :
+									sw[0][4:2] == 3'd1 ?	hustle_dip_freegame_15000 :
+									sw[0][4:2] == 3'd1 ?	hustle_dip_freegame_15000 :
+															hustle_dip_freegame_none;
+
 ///////////////////   INPUTS   ////////////////////
-wire [7:0] IN0 = 8'hFF; // IN0 is unused in Blockade
-wire [7:0] IN1 = ~{btn_coin, dip_lives, 1'b0, btn_boom, 2'b00 };
-wire [7:0] IN2 = ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up};
+
+reg [1:0] game_mode /*verilator public_flat*/;
+localparam GAME_BLOCKADE = 0;
+localparam GAME_COMOTION = 1;
+localparam GAME_HUSTLE = 2;
+reg [7:0] IN_1;
+reg [7:0] IN_2;
+reg [7:0] IN_4;
+always @(posedge clk_sys) 
+begin
+	// Set game mode
+	if (ioctl_wr & (ioctl_index==1)) game_mode <= ioctl_dout[1:0];
+
+	// Game specific inputs
+	case (game_mode)
+		GAME_BLOCKADE: begin 	
+			IN_1 <= ~{btn_coin, dip_blockade_lives, 1'b0, btn_boom, 2'b00}; // Coin + DIPS
+			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
+			IN_4 <= ~{8'b00000000}; // Unused
+		end
+		GAME_COMOTION: begin 
+			IN_1 <= ~{btn_coin, 2'b0, btn_start, dip_comotion_lives, btn_boom, 2'b00}; // Coin + DIPS
+			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
+			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p3_left, p3_down, p3_right, p3_up}; // P2 + P3 Controls
+		end
+		GAME_HUSTLE: begin 
+			IN_1 <= ~{btn_coin, 2'b0, btn_start2, btn_start1, dip_hustle_time, dip_hustle_coin}; // Coin + DIPS
+			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
+			IN_4 <= dip_hustle_freegame; // Extra DIPS
+		end
+	endcase
+end
 
 ///////////////////   VIDEO   ////////////////////
 reg ce_pix;
@@ -346,9 +405,10 @@ blockade blockade (
 	.g(g),
 	.b(b),
 	.ce_pix(ce_pix),
-	.in0(IN0),
-	.in1(IN1),
-	.in2(IN2),
+	.in_1(IN_1),
+	.in_2(IN_2),
+	.in_4(IN_4),
+	.coin(btn_coin),
 	.hsync(hs_original),
 	.vsync(vs_original),
 	.hblank(hblank),
