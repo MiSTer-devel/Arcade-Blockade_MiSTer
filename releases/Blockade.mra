@@ -8,7 +8,7 @@
 	<rbf>blockade</rbf>
 
 	<buttons default="Start" names="Start"></buttons>
-	<switches default="00">
+	<switches default="03">
 		<dip bits="0,1" ids="3,4,5,6" name="Lives" values="0,1,2,3"></dip>
 		<dip bits="2,3" ids="Green,White,Yellow,Red" name="Overlay Colour" values="0,1,2,3"></dip>
 	</switches>
