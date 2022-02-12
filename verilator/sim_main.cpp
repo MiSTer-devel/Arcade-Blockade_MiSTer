@@ -41,8 +41,8 @@ bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
 
-//#define IS_BLOCKADE
-#define IS_COMOTION
+#define IS_BLOCKADE
+//#define IS_COMOTION
 //#define IS_HUSTLE
 //#define IS_BLASTO
 
@@ -484,6 +484,8 @@ int main(int argc, char** argv, char** env)
 	bus.QueueDownload("roms/blockade/316-0002.u29", 0); // Repeat PROMs for padding (256 bytes only)
 	bus.QueueDownload("roms/blockade/316-0001.u43", 0);
 	bus.QueueDownload("roms/blockade/316-0001.u43", 0); // Repeat PROMs for padding (256 bytes only)
+	// Set overlay
+	top->emu__DOT__overlay_type = 0;
 #endif
 
 #ifdef IS_COMOTION
@@ -495,6 +497,8 @@ int main(int argc, char** argv, char** env)
 	bus.QueueDownload("roms/comotion/316-06.u43", 0); // Repeat PROMs for padding (256 bytes only)
 	bus.QueueDownload("roms/comotion/316-05.u29", 0);
 	bus.QueueDownload("roms/comotion/316-05.u29", 0); // Repeat PROMs for padding (256 bytes only)
+	// Set overlay
+	top->emu__DOT__overlay_type = 0;
 #endif
 
 #ifdef IS_HUSTLE
@@ -504,6 +508,8 @@ int main(int argc, char** argv, char** env)
 	bus.QueueDownload("roms/hustle/3160019.u5", 0);
 	bus.QueueDownload("roms/hustle/3160020.u29", 0);
 	bus.QueueDownload("roms/hustle/3160021.u43", 0);
+	// Set overlay
+	top->emu__DOT__overlay_type = 0;
 #endif
 
 #ifdef IS_BLASTO
@@ -513,14 +519,13 @@ int main(int argc, char** argv, char** env)
 	bus.QueueDownload("roms/blasto/blasto.u5", 0); 
 	bus.QueueDownload("roms/blasto/blasto.u29", 0);
 	bus.QueueDownload("roms/blasto/blasto.u43", 0);
+	// Set overlay
+	top->emu__DOT__overlay_type = 1;
 #endif
 
 	// Set game mode
 	top->emu__DOT__game_mode = game_mode;
-
-	// Set overlay
-	top->emu__DOT__overlay_type = 3;
-	
+		
 
 	// Setup video output
 	if (video.Initialise(windowTitle) == 1) { return 1; }
