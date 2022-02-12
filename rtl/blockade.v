@@ -531,25 +531,24 @@ spram #(8,8) sram
 
 // U29, U43 - Graphics PROMs
 // --------------------
-// Each ROM is 256 x 4 bytes.  Combined to 8 bytes with U29 as most significant bits, U43 as least significant bits
+// Blockade and CoMotion - each ROM is 256 x 4 bytes.
+// Hustle - each ROM is 512 x 4 bytes.
+// Combined to 8 bytes with U29 as most significant bits, U43 as least significant bits
 
 // Graphics PROM data outs
 wire [3:0] prom_data_out_lsb;
 wire [3:0] prom_data_out_msb;
 wire [7:0] prom_data_out = { prom_data_out_msb, prom_data_out_lsb } ;
 
-localparam PROM_SIZE = 9;
 // Graphics PROM read adress
-wire [PROM_SIZE-1:0] prom_addr = { vram_data_out[5:0], vcnt[2:0] };
-//wire [8:0] prom_addr = { 1'b0, vram_data_out[4:0], vcnt[2:0] };
+wire [8:0] prom_addr = { vram_data_out[5:0], vcnt[2:0] };
 
 // Graphics ROM download write enables
 wire prom_msb_wr = dn_addr[12:9] == 4'b1000 && dn_wr;
 wire prom_lsb_wr = dn_addr[12:9] == 4'b1001 && dn_wr;
 
-
 // Graphics PROM - U29 - Most-significant bits
-dpram #(PROM_SIZE,4) prom_msb
+dpram #(9,4) prom_msb
 (
 	.clock_a(clk),
 	.address_a(prom_addr),
@@ -558,13 +557,13 @@ dpram #(PROM_SIZE,4) prom_msb
 	.q_a(prom_data_out_msb),
 
 	.clock_b(clk),
-	.address_b(dn_addr[PROM_SIZE-1:0]),
+	.address_b(dn_addr[8:0]),
 	.wren_b(prom_msb_wr),
 	.data_b(dn_data[3:0]),
 	.q_b()
 );
 // Graphics ROM - U43 - Least-significant bits
-dpram #(PROM_SIZE,4) prom_lsb
+dpram #(9,4) prom_lsb
 (
 	.clock_a(clk),
 	.address_a(prom_addr),
@@ -573,12 +572,11 @@ dpram #(PROM_SIZE,4) prom_lsb
 	.q_a(prom_data_out_lsb),
 
 	.clock_b(clk),
-	.address_b(dn_addr[PROM_SIZE-1:0]),
+	.address_b(dn_addr[8:0]),
 	.wren_b(prom_lsb_wr),
 	.data_b(dn_data[3:0]),
 	.q_b()
 );
-
 
 reg [15:0] sound_rom_addr;
 wire [7:0] sound_rom_data_out;
