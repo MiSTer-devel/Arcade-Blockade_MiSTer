@@ -16,45 +16,38 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.*/
 
-//This is a variation of Gregory Hogan's MISTer Genesis core low-pass filter
-//tuned to low-pass filter the YM2149 on Arkanoid.
-
 `timescale 1 ps / 1 ps
 
-module blockade_lpf(
+module blockade_lpf
+(
 	input clk,
 	input reset,
 	input signed [15:0] in,
-	output signed [15:0] out);
-	
-	reg [9:0] div = 256; //Sample at 48MHz/256 = 187500Hz
-	
-	//Coefficients computed with Octave/Matlab/Online filter calculators.
-	//or with scipy.signal.bessel or similar tools
-	
-	//0.22211491, 0.22211491
-	//1.0000000, -0.55577018
+	output signed [15:0] out
+);
+
+	reg [9:0] div = 256;
 	reg signed [17:0] A2;
 	reg signed [17:0] B2;
 	reg signed [17:0] B1;
-	
 	wire signed [15:0] audio_post_lpf1;
-		
+
+	// Parameters calculated for a cut-off frequency of 723.43Hz 
 	always @ (*) begin
 		A2 = -18'd32312;
 		B1 = 18'd228;
 		B2 = 18'd228;
 	end
-	
+
 	iir_1st_order lpf6db(.clk(clk),
-								.reset(reset),
-								.div(div),
-								.A2(A2),
-								.B1(B1),
-								.B2(B2),
-								.in(in),
-								.out(audio_post_lpf1)); 
-	 
+						.reset(reset),
+						.div(div),
+						.A2(A2),
+						.B1(B1),
+						.B2(B2),
+						.in(in),
+						.out(audio_post_lpf1));
+
 	assign out = audio_post_lpf1;
 
 endmodule

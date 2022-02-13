@@ -1,3 +1,24 @@
+/*============================================================================
+	FPGA implementation of Blockade by Gremlin Industries for MiSTer
+
+	Author: Jim Gregory - https://github.com/JimmyStones/
+	Version: 1.0
+	Date: 2022-02-13
+
+	This program is free software; you can redistribute it and/or modify it
+	under the terms of the GNU General Public License as published by the Free
+	Software Foundation; either version 3 of the License, or (at your option)
+	any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License along
+	with this program. If not, see <http://www.gnu.org/licenses/>.
+===========================================================================*/
+
 `timescale 1 ps / 1 ps
 
 module blockade (
@@ -31,82 +52,71 @@ localparam GAME_COMOTION = 1;
 localparam GAME_HUSTLE = 2;
 localparam GAME_BLASTO = 3;
 
-// CPU reset can come from reset signal or coin start signal
-wire RESET = reset || (game_mode != GAME_BLOCKADE && coin_start > 6'b0);
+// CPU and Video system clock enables
+// ----------------------------------
 
-// Generate video and CPU enables
 // - Replaces U31, U17, U8, U18 section of circuit
 reg [3:0] phi_count;
 reg [1:0] vid_count;
 always @(posedge clk) begin
 	// Phi counter is 0-9, generates PHI_1 and PHI_2 enable signals for CPU
 	phi_count <= (phi_count == 4'd9) ? 4'b0 : phi_count + 1'b1;
-
 	// Video counter is 0-3, generates ce_vid and ce_pix signals for video circuit
 	vid_count <= vid_count + 2'b1;
 end
+// Video and pixel clock every 4 cycles of system clock
+// - Video system clock one cycle ahead of pixel clock so video memory reads have time to complete
 wire ce_vid = (vid_count == 2'd0);
 assign ce_pix = (vid_count == 2'd3);
+// 8080A CPU timing
+// PHI1: XX--------
+// PHI2: ---XXXXXX-
 wire PHI_1 = phi_count[3:1] == 3'b000;
 wire PHI_2 = phi_count >= 4'd3 && phi_count <= 4'd8;
 
 // U21 - Video RAM address select
 wire a12_n_a15 = ADDR[15] && ~ADDR[12];
 
+
+// CPU
+// ---
+
 // U9 D flip-flop - Disables CPU using READY signal when attempting to write VRAM during vblank
 reg u9_q;
 reg PHI_2_last;
 always @(posedge clk) begin
-	if(reset)
-	begin
-	 	u9_q <= 1'b1;
-	end
+	if(reset) 
+		u9_q <= 1'b1;
 	else
-	begin
-		PHI_2_last <= PHI_2;
-		if(PHI_2 && !PHI_2_last)
-		begin
-			if(VBLANK_N && a12_n_a15)
-				u9_q <= 1'b0;
-			else
-				u9_q <= 1'b1;
-		end
-	end
+		if(PHI_2) u9_q <= ~(VBLANK_N && a12_n_a15);
 end
 
-// Address decode
-wire rom1_cs = (!ADDR[15] && !ADDR[11] && !ADDR[10] && MEMR);
-wire rom2_cs = (!ADDR[15] && !ADDR[11] && ADDR[10] && MEMR);
-
-localparam COIN_LATCH_WIDTH = 6;
-
-// Input data selector
-wire [7:0] IN_1 = { ~(coin_latch > {COIN_LATCH_WIDTH{1'b0}}), in_1[6:0] };
-wire [7:0] IN_2 = in_2;
-wire [7:0] IN_4 = in_4;
-
+// Input data address selector
 wire INP_1 = INP && ADDR[0];
 wire INP_2 = INP && ADDR[1];
 wire INP_4 = INP && ADDR[2];
 
-wire [7:0] inp_data_out =	ADDR[0] ? IN_1 : // IN_1
-							ADDR[1] ? IN_2 : // IN_2
-							ADDR[2] ? IN_4 : // IN_4 - Not connected in Blockade
-							8'h00;
-
-// CPU data selector
-wire [7:0] cpu_data_in = INP ? inp_data_out :
+// CPU data in mux
+wire [7:0] cpu_data_in = INP_1 ? { ~(coin_latch > 6'b0), in_1[6:0] } :
+						 INP_2 ? in_2 :
+						 INP_4 ? in_4 :
 						 rom1_cs ? rom1_data_out :
 						 rom2_cs ? rom2_data_out :
 						 vram_cs ? vram_data_out_cpu :
 						 sram_cs ? sram_data_out :
 						 8'h00;
 
+// CPU signals
 wire [15:0] ADDR;
 wire [7:0] DATA;
 wire DBIN;
 wire WR_N;
 wire SYNC /*verilator public_flat*/;
+
+// CPU reset can originate from system reset signal or coin start signal (only for CoMotion, Hustle, and Blasto)
+wire RESET = reset || (game_mode != GAME_BLOCKADE && coin_start > 6'b0);
+
+// 8080A CPU
 vm80a cpu
 (
 	.pin_clk(clk),
@@ -125,18 +135,16 @@ vm80a cpu
 	.pin_dbin(DBIN),
 	.pin_wr_n(WR_N)
 );
+
+// Handle CPU in/out data buffer
 assign DATA = DBIN ? cpu_data_in: 8'hZZ;
 reg [7:0] cpu_data_out;
 always @(posedge clk) begin
-	if(!WR_N)
-	begin
-		cpu_data_out <= DATA;
-	end
+	if(!WR_N) cpu_data_out <= DATA;
 end
 
-
-// Video timing circuit
-
+// Video timing generator
+// ----------------------
 // - Constants
 localparam HBLANK_START = 9'd255;
 localparam HSYNC_START = 9'd272;
@@ -152,14 +160,14 @@ localparam VRESET_LINE = 9'd261;
 reg [8:0] hcnt;
 reg [8:0] vcnt;
 
-// Signals
+// Video event signals
 reg HBLANK_N = 1'b1;
 reg HSYNC_N = 1'b1;
 reg HSYNC_N_last = 1'b1;
 wire VBLANK_N = ~(vcnt >= VBLANK_START);
 wire VSYNC_N = ~(vcnt >= VSYNC_START && vcnt <= VSYNC_END);
 
-// Video read addresses
+// Video RAM read addresses
 reg [2:0] prom_col;
 wire [9:0] vram_read_addr = { vcnt[7:3], hcnt[7:3] }; // Generate VRAM read address from h/v counters { 128V, 64V, 32V, 16V, 8V, 128H, 64H, 32H, 16H, 8H };
 
@@ -187,13 +195,9 @@ begin
 		if(HSYNC_N && !HSYNC_N_last) // Leaving hysnc
 		begin
 			if (vcnt == VRESET_LINE) // Vertical reset point reached
-			begin
 				vcnt <= 9'b0;        // Reset vertical counter
-			end
 			else
-			begin
 				vcnt <= vcnt + 9'b1; // Increment vertical counter
-			end
 		end
 	end
 end
@@ -204,6 +208,10 @@ assign hsync = ~HSYNC_N;
 assign hblank = ~HBLANK_N;
 assign vblank = ~VBLANK_N;
 assign vsync = ~VSYNC_N;
+
+
+// CPU IO control latches
+// ----------------------
 
 // U45 AND - Enable for U51 latch
 wire u45 = PHI_1 && SYNC;
@@ -223,27 +231,39 @@ wire INP = (u51_latch[2] && DBIN);
 wire MEMR = (u51_latch[3] && DBIN);
 
 
-// AUDIO
+// Discrete audio circuit
+// ----------------------
+
+// 555 timer generates a base square wave at 93Khz-ish
 wire u68_out;
 reg u68_out_last;
-ttl_555 #(
-	.HIGH_COUNTS(140),
-	.LOW_COUNTS(51)
+astable_555 #(
+	.HIGH_PERIOD(70),
+	.LOW_PERIOD(26)
+	// .HIGH_PERIOD(140),
+	// .LOW_PERIOD(51)
 ) u68 (
 	.clk(clk),
 	.reset(RESET),
 	.out(u68_out)
 );
 
+// U66 and U77 make up an 8-bit counter which is preloaded on overflow from U61 and U62 latches.
+reg [7:0] u6261;
 reg [7:0] u6766_count;
 reg u6766_out;
 reg u6766_out_last;
+wire OUTP2 = OUTP && ADDR[1];
 
 always @(posedge clk)
 begin
+
+	if(OUTP2) u6261 <= DATA; // OUTP2 - Latch CPU data into counter preloaders
+
 	u68_out_last <= u68_out;
 	if(RESET)
 	begin
+		// Reset preloader and counter outputs 
 		u6766_count <= 8'b0;
 		u6766_out <= 1'b0;
 		u6766_out_last <= 1'b0;
@@ -255,14 +275,11 @@ begin
 		begin
 			if(u6766_out) // Load new inputs when counter overflows
 			begin
-				 // load parallel inputs
-				//$display("Loading u6766: %b", { u66_p, u67_p });
-				u6766_count <= u6766_p;
+				u6766_count <= u6261;
 				u6766_out <= 1'b0;
 			end
 			else
-			begin
-				// count up
+			begin // Increment counter and output high if counter is overflowing
 				u6766_count <= u6766_count + 8'b1;
 				u6766_out <= (u6766_count == 8'd255);
 			end
@@ -270,43 +287,27 @@ begin
 	end
 end
 
-reg [7:0] u6766_p;
-wire u60_1_ce = ~u6766_out;
+// U60 flip-flop - sound circuit enable and final /2 stage
 reg u60_1_q;
-
-// U60_1 flip flop
+reg u60_2_q;
 always @(posedge clk)
 begin
 	if(RESET)
 		u60_1_q <= 1'b0;
 	else
-		if(u60_1_ce) u60_1_q <= 1'b1;
-end
-
-// U60_2 flip flop
-reg u60_2_q;
-always @(posedge clk)
-begin
-	if(~u60_1_q)
 	begin
-		u60_2_q <= 1'b0;
-	end
-	else
-	begin
-		if(u6766_out && !u6766_out_last)
-		begin
-			u60_2_q <= ~u60_2_q;
-		end
+		if(!u6766_out) u60_1_q <= 1'b1;
+		if(~u60_1_q) u60_2_q <= 1'b0;
+		else
+			if(u6766_out && !u6766_out_last) u60_2_q <= ~u60_2_q;
 	end
 end
-// SOUND SAMPLE
 
-//assign audio_l = { 2'b0, u66_q, 10'b0 };
-// assign audio_r = { 2'b0, u66_q, 10'b0 };
-//wire signed [15:0] sound_out = (u6766_p == 8'hFF) ? 0 : (!u60_2_q ? -30000 : 30000);
-wire signed [15:0] sound_out = (!u60_2_q ? -30000 : 30000);
+// Amplify square wave to produce output
+wire signed [15:0] sound_out = (!u60_2_q ? -20000 : 20000);
 
-// Low-pass filter the audio output
+// Low-pass filter the square wave
+// - Cut-off frequency of 723.43Hz calculated from 220K resistor and 0.001µF capacitor pairing
 wire signed [15:0] sound_filtered;
 blockade_lpf lpf
 (
@@ -316,12 +317,42 @@ blockade_lpf lpf
 	.out(sound_filtered)
 );
 
-// WAV PLAYER
+
+// Boom circuit
+// ------------
+// This is an analog noise generator which I can't replicate, so we have wave playback of a MAME-source sample
+
+// Trigger circuit
+wire u50_1 = ~(OUTP && ADDR[3]);
+wire u50_2 = ~(OUTP && ADDR[2]);
+/* verilator lint_off UNOPTFLAT */
+wire u50_3 = ~(u50_1 && u50_4);
+wire u50_4 = ~(u50_2 && u50_3);
+/* verilator lint_on UNOPTFLAT */
+always @(posedge clk) begin
+	// Trigger ENV sound (play boom sample)
+	wav_play <= u50_4;
+end
+
+// Wave player
+reg [15:0] wave_rom_addr;
+wire [7:0] wave_rom_data_out;
+reg [15:0] wave_rom_length = 16'd38174;
+// Wave sample for boom sound
+spram #(16,8, "boom.hex") wave_rom
+(
+	.clk(clk),
+	.address(wave_rom_addr),
+	.wren(1'b0),
+	.data(),
+	.q(wave_rom_data_out)
+);
 reg wav_playing = 1'b0;
 reg wav_play = 1'b0;
 reg [WAV_COUNTER_SIZE-1:0] wav_counter;
-localparam WAV_COUNTER_SIZE = 9;
-reg signed [8:0] wav_out;
+localparam WAV_COUNTER_SIZE = 10;
+localparam WAV_COUNTER_MAX = 1000;
+reg signed [7:0] wav_signed;
 always @(posedge clk)
 begin
 	if(!wav_playing)
@@ -329,9 +360,8 @@ begin
 		if(wav_play)
 		begin
 			wav_playing <= 1'b1;
-			wav_play <= 1'b0;
-			sound_rom_addr <= 16'b0;
-			wav_counter <= {WAV_COUNTER_SIZE{1'b1}};
+			wave_rom_addr <= 16'b0;
+			wav_counter <= WAV_COUNTER_MAX;
 		end
 	end
 	else
@@ -339,100 +369,70 @@ begin
 		wav_counter <= wav_counter - 1'b1;
 		if(wav_counter == {WAV_COUNTER_SIZE{1'b0}})
 		begin
-			$display("WAV: %d %d %d", sound_rom_addr, sound_rom_data_out, wav_out);
-			if(sound_rom_addr < sound_rom_length)
+			if(wave_rom_addr < wave_rom_length)
 			begin
-				wav_out <= {1'b0, sound_rom_data_out } - $signed(9'd128);
-				sound_rom_addr <= sound_rom_addr + 16'b1;
+				wav_signed <= wave_rom_data_out;
+				wave_rom_addr <= wave_rom_addr + 16'b1;
 				wav_counter <= {WAV_COUNTER_SIZE{1'b1}};
 			end
 			else
 			begin
-				wav_out <= 9'b0;
-				sound_rom_addr <= 16'b0;
+				wav_signed <= 8'b0;
+				wave_rom_addr <= 16'b0;
 				wav_playing <= 1'b0;
 			end
 		end
 	end
 end
 
-
-//assign audio_l = 16'hFFFF - sound_filtered;
-assign audio_l = { wav_out, 7'b0 };
-//assign audio_l = 16'hFFFF - sound_filtered;
-//assign audio_r = { 1'b0, wav_out, 7'b0 };
+wire signed [15:0] wav_amplified = { wav_signed[7], {1{wav_signed[7]}}, wav_signed[6:0], {7{wav_signed[7]}} };
 
 
-///// OUTPUT CONTROL
+// Audio mixer
+// -----------
+// - Combine discrete audio circuit and wave output, then invert
+wire signed [15:0] sound_combined = sound_filtered + wav_amplified;
+assign audio_l = 16'hFFFF - sound_combined;
+assign audio_r = audio_l;
 
-// ENV Sound
-wire u50_1 = ~(OUTP && ADDR[3]);
-wire u50_2 = ~(OUTP && ADDR[2]);
-/* verilator lint_off UNOPTFLAT */
-wire u50_3 = ~(u50_1 && u50_4);
-wire u50_4 = ~(u50_2 && u50_3);
-/* verilator lint_on UNOPTFLAT */
 
-// OUTP1 - Coin latch
+// Coin circuit
+// ------------
 wire OUTP1 = OUTP && ADDR[0];
-wire OUTP2 = OUTP && ADDR[1];
-reg u14_3qn;
 reg coin_last;
 reg [5:0] coin_start;
 reg coin_inserted;
-reg [COIN_LATCH_WIDTH-1:0] coin_latch;
+reg [5:0] coin_latch;
 
 always @(posedge clk) begin
-	if(INP_1)
-	begin
-		if(coin_inserted)
-		begin
-			//$display("INP1 - coin_inserted");
-			// if(DATA[7])
-			// begin
-			//	$display("Coin latch on");
-				coin_latch <= {COIN_LATCH_WIDTH{1'b1}};
-				coin_inserted <= 1'b0;
-			// end
-		end
-		if(coin_latch > {COIN_LATCH_WIDTH{1'b0}})
-		begin
-			coin_latch <= coin_latch - {{COIN_LATCH_WIDTH-1{1'b0}},1'b1};
-			//if(coin_latch == {{COIN_LATCH_WIDTH-1{1'b0}},1'b1}) $display("Coin latch off");
-		end
-		//$display("INP1: IN_1=%b  coin_in:%d  coin_l:%d", IN_1, coin_inserted, coin_latch);
-	end
-
 	if(reset)
 	begin
-		coin_latch <= {COIN_LATCH_WIDTH{1'b0}};
+		coin_latch <= 6'b0;
 		coin_inserted <= 1'b0;
 	end
-
-	if(coin_start > 6'b0) coin_start <= coin_start - 6'b1;
-	
-	if(OUTP2) u6766_p <= DATA; // OUTP2 - Movement sound latch
-
-	if(OUTP1)
+	else
 	begin
-//		$display("OUTP: IN_1=%b IN_2=%b IN_4=%b coin_in:%d  coin_l:%d", ADDR[0], ADDR[1], ADDR[2], coin_inserted, coin_latch);
-		u14_3qn <= ~DATA[7];
-	end
-	
-	coin_last <= coin;
-	if(coin && !coin_last)
-	begin
-//		$display("COIN: IN_1=%b IN_2=%b IN_4=%b coin_in:%d  coin_l:%d", ADDR[0], ADDR[1], ADDR[2], coin_inserted, coin_latch);
-		coin_inserted <= 1'b1;
-		coin_start <= 6'b111111;
-	end
+		// Register inserted coin when INP_1 active
+		if(INP && ADDR[0])
+		begin
+			if(coin_inserted)
+			begin
+				coin_latch <= 6'b111111;
+				coin_inserted <= 1'b0;
+			end
+			if(coin_latch > 6'b0) coin_latch <= coin_latch - 1'b1;
+		end
 
-//	if(coin_start>6'b0) $display("coin_start");
+		// When coin input is going high, latch coin inserted and start reset pulse
+		coin_last <= coin;
+		if(coin && !coin_last)
+		begin
+			coin_inserted <= 1'b1;
+			coin_start <= 6'b111111;
+		end
 
-	// end
-	if(u50_4)
-	begin
-		wav_play <= 1'b1;
+		// Decrement coin start timer if active
+		if(coin_start > 6'b0) coin_start <= coin_start - 6'b1;
 	end
 end
 
@@ -451,6 +451,10 @@ wire [7:0] rom1_data_out = { rom1_data_out_msb, rom1_data_out_lsb };
 wire [3:0] rom2_data_out_lsb;
 wire [3:0] rom2_data_out_msb;
 wire [7:0] rom2_data_out = { rom2_data_out_msb, rom2_data_out_lsb };
+
+// Program ROM CPU address decode
+wire rom1_cs = (!ADDR[15] && !ADDR[11] && !ADDR[10] && MEMR);
+wire rom2_cs = (!ADDR[15] && !ADDR[11] && ADDR[10] && MEMR);
 
 // Program ROM download write enables
 wire rom1_msb_wr = dn_addr[12:10] == 3'b000 && dn_wr;
@@ -616,19 +620,6 @@ dpram #(9,4) prom_lsb
 	.wren_b(prom_lsb_wr),
 	.data_b(dn_data[3:0]),
 	.q_b()
-);
-
-reg [15:0] sound_rom_addr;
-wire [7:0] sound_rom_data_out;
-reg [15:0] sound_rom_length = 16'd38174;
-// Sound samples
-spram #(16,8, "sound.hex") sound_rom
-(
-	.clk(clk),
-	.address(sound_rom_addr),
-	.wren(1'b0),
-	.data(),
-	.q(sound_rom_data_out)
 );
 
 endmodule

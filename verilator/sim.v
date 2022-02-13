@@ -103,7 +103,7 @@ module emu(
 	always @(posedge clk_sys) begin
 		case (game_mode)
 		GAME_BLOCKADE: begin 
-			IN_1 <= ~{btn_coin, blockade_dip_lives_3, 1'b0, btn_boom, 2'b00}; // Coin + DIPS
+			IN_1 <= ~{btn_coin, blockade_dip_lives_4, 1'b0, btn_boom, 2'b00}; // Coin + DIPS
 			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
 			IN_4 <= ~{8'b00000000}; // Unused
 		end

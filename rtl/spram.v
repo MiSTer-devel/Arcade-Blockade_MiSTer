@@ -1,5 +1,3 @@
-`timescale 1 ps / 1 ps
-
 /*============================================================================
 	Generic single-port RAM module
 
@@ -20,6 +18,8 @@
 	You should have received a copy of the GNU General Public License along
 	with this program. If not, see <http://www.gnu.org/licenses/>.
 ===========================================================================*/
+
+`timescale 1 ps / 1 ps
 
 module spram # (
 	parameter address_width = 8,

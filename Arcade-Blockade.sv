@@ -185,7 +185,7 @@ assign VGA_F1 = 0;
 assign VGA_SCALER = 0;
 assign HDMI_FREEZE = 0;
 
-assign AUDIO_S = 0;
+assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 
 assign LED_DISK = 0;
@@ -410,6 +410,7 @@ end
 ///////////////////   VIDEO   ////////////////////
 reg ce_pix;
 wire hblank, vblank, hs, vs, hs_original, vs_original;
+wire video;
 wire [2:0] video_rgb = {3{video}} & overlay_mask;
 wire [23:0] rgb = {{8{video_rgb[0]}},{8{video_rgb[1]}},{8{video_rgb[2]}}};
 
