@@ -322,7 +322,7 @@ blockade_lpf lpf
 // ------------
 // This is an analog noise generator which I can't replicate, so we have wave playback of a MAME-source sample
 
-// Trigger circuit
+// Trigger circuit (OUTP_4 and OUTP_8)
 wire u50_1 = ~(OUTP && ADDR[3]);
 wire u50_2 = ~(OUTP && ADDR[2]);
 /* verilator lint_off UNOPTFLAT */

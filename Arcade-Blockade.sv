@@ -299,8 +299,6 @@ wire btn_start2 = joystick_1[5];
 wire btn_fire1 = joystick_0[6];
 wire btn_fire2 = joystick_1[6];
 
-wire btn_boom = 1'b0;
-
 ///////////////////   DIPS   ////////////////////
 
 reg [2:0] dip_blockade_lives;
@@ -311,7 +309,9 @@ reg dip_hustle_time;
 reg [1:0] dip_blasto_coin;
 reg dip_blasto_demosounds;
 reg dip_blasto_time;
-reg [1:0] overlay_type;
+
+reg dip_boom;
+reg [1:0] dip_overlay_type;
 reg [2:0] overlay_mask;
 
 reg [7:0] sw[8];
@@ -329,12 +329,14 @@ begin
 		2'd2: dip_blockade_lives <= 3'b100; // 5 lives
 		2'd3: dip_blockade_lives <= 3'b000; // 6 lives
 		endcase
-		overlay_type <= sw[0][3:2];
+		dip_overlay_type <= sw[0][3:2];
+		dip_boom <= sw[0][4];
 	end
 	GAME_COMOTION:
 	begin
 		dip_comotion_lives <= sw[0][0];
-		overlay_type <= sw[0][2:1];
+		dip_overlay_type <= sw[0][2:1];
+		dip_boom <= sw[0][3];
 	end
 	GAME_HUSTLE:
 	begin
@@ -346,19 +348,19 @@ begin
 		2'd3: dip_hustle_freegame <= 8'b01110001;
 		endcase
 		dip_hustle_time <= sw[0][4];
-		overlay_type <= sw[0][6:5];
+		dip_overlay_type <= sw[0][6:5];
 	end
 	GAME_BLASTO:
 	begin
 		dip_blasto_coin = sw[0][1:0];
 		dip_blasto_demosounds = sw[0][2];
 		dip_blasto_time = sw[0][3];
-		overlay_type <= sw[0][5:4];
+		dip_overlay_type <= sw[0][5:4];
 	end
 	endcase
 
 	// Generate overlay colour mask
-	case(overlay_type)
+	case(dip_overlay_type)
 	2'd0: overlay_mask <= 3'b010; // Green
 	2'd1: overlay_mask <= 3'b111; // White
 	2'd2: overlay_mask <= 3'b011; // Yellow
@@ -385,12 +387,12 @@ begin
 	// Game specific inputs
 	case (game_mode)
 		GAME_BLOCKADE: begin 	
-			IN_1 <= ~{btn_coin, dip_blockade_lives, 1'b0, btn_boom, 2'b00}; // Coin + DIPS
+			IN_1 <= ~{btn_coin, dip_blockade_lives, 1'b0, dip_boom, 2'b00}; // Coin + DIPS
 			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
 			IN_4 <= ~{8'b00000000}; // Unused
 		end
 		GAME_COMOTION: begin 
-			IN_1 <= ~{btn_coin, 2'b0, btn_start, dip_comotion_lives, btn_boom, 2'b00}; // Coin + DIPS
+			IN_1 <= ~{btn_coin, 2'b0, btn_start, dip_comotion_lives, dip_boom, 2'b00}; // Coin + DIPS
 			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
 			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p3_left, p3_down, p3_right, p3_up}; // P2 + P3 Controls
 		end
