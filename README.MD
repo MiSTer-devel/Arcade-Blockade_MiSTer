@@ -1,12 +1,12 @@
 # Blockade by Sega/Gremlin Industries for [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki)
 
-An FPGA implementation of Blockade arcade hardware by Gremlin Industries for the MiSTer platform,
+An FPGA implementation of Blockade arcade hardware by Gremlin Industries for the MiSTer platform.
 
 ## Credits
-- JimmyStones: Core design and implementation
-- Vslav (1801BM1): vm80a (https://github.com/1801BM1/vm80a) CPU module - an 8080A implementation reverse engineered from a Soviet replica!
-- Jotego: JTFRAME/jtframe_resync module for analog video H/V re-positioning
-- Gregory Hogan (Soltan_G42): 1st order low-pass filter for audio circuit - thanks also to Ace (Ace9921) for explanations on how to use and tune the filter.
+- __JimmyStones__: Core design and implementation
+- __Vslav (1801BM1)__: [vm80a](https://github.com/1801BM1/vm80a) CPU (8080A implementation reverse engineered from a Soviet replica!)
+- __Jotego__: [jtframe_resync](https://github.com/jotego/jtframe/blob/master/hdl/video/jtframe_resync.v) for analog video H/V re-positioning
+- __Soltan_G42__: 1st order low-pass filter for audio circuit - thanks also to __Ace__ for explanations on how to use and tune the filter
 
 ## Implementation details
 - Built entirely in simulation using original schematics and information from MAME, logic has been simplified where possible
@@ -33,7 +33,7 @@ ROMs are not included. In order to use this arcade core, you must provide the co
 
 To simplify the process, .mra files are provided in the releases folder that specify the required ROMs along with their checksums.  The ROM's .zip filename refers to the corresponding file in the M.A.M.E. project.
 
-Please refer to https://github.com/MiSTer-devel/Main_MiSTer/wiki/Arcade-Roms for information on how to setup and use the environment.
+Please refer to https://github.com/MiSTer-devel/Main_MiSTer/wiki/Arcade-Roms-and-MRA-files for information on how to setup and use the environment.
 
 Quick reference for folders and file placement:
 
