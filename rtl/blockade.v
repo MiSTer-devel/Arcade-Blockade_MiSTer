@@ -150,8 +150,8 @@ localparam HBLANK_START = 9'd255;
 localparam HSYNC_START = 9'd272;
 localparam HSYNC_END = 9'd300;
 localparam HRESET_LINE = 9'd329;
-localparam VSYNC_START = 9'd256;
-localparam VSYNC_END = 9'd258;
+localparam VSYNC_START = 9'd238;
+localparam VSYNC_END = 9'd248;
 localparam VBLANK_START = 9'd224;
 localparam VBLANK_END = 9'd261;
 localparam VRESET_LINE = 9'd261;
@@ -355,31 +355,38 @@ localparam WAV_COUNTER_MAX = 1000;
 reg signed [7:0] wav_signed;
 always @(posedge clk)
 begin
-	if(!wav_playing)
+	if(RESET)
 	begin
-		if(wav_play)
-		begin
-			wav_playing <= 1'b1;
-			wave_rom_addr <= 16'b0;
-			wav_counter <= WAV_COUNTER_MAX;
-		end
+		wav_signed <= 8'b0;
 	end
 	else
 	begin
-		wav_counter <= wav_counter - 1'b1;
-		if(wav_counter == {WAV_COUNTER_SIZE{1'b0}})
+		if(!wav_playing)
 		begin
-			if(wave_rom_addr < wave_rom_length)
+			if(wav_play)
 			begin
-				wav_signed <= wave_rom_data_out;
-				wave_rom_addr <= wave_rom_addr + 16'b1;
-				wav_counter <= {WAV_COUNTER_SIZE{1'b1}};
-			end
-			else
-			begin
-				wav_signed <= 8'b0;
+				wav_playing <= 1'b1;
 				wave_rom_addr <= 16'b0;
-				wav_playing <= 1'b0;
+				wav_counter <= WAV_COUNTER_MAX;
+			end
+		end
+		else
+		begin
+			wav_counter <= wav_counter - 1'b1;
+			if(wav_counter == {WAV_COUNTER_SIZE{1'b0}})
+			begin
+				if(wave_rom_addr < wave_rom_length)
+				begin
+					wav_signed <= wave_rom_data_out;
+					wave_rom_addr <= wave_rom_addr + 16'b1;
+					wav_counter <= {WAV_COUNTER_SIZE{1'b1}};
+				end
+				else
+				begin
+					wav_signed <= 8'b0;
+					wave_rom_addr <= 16'b0;
+					wav_playing <= 1'b0;
+				end
 			end
 		end
 	end

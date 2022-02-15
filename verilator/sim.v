@@ -4,7 +4,7 @@
 module emu(
 
 	input clk_sys /*verilator public_flat*/,
-	input reset/*verilator public_flat*/,
+	input RESET /*verilator public_flat*/,
 	input [12:0]  inputs/*verilator public_flat*/,
 
 	output [7:0] VGA_R/*verilator public_flat*/,
@@ -156,9 +156,14 @@ module emu(
 	assign AUDIO_L = audio_l;
 	assign AUDIO_R = audio_r;
 
+	reg rom_downloaded = 0;
+	wire rom_download = ioctl_download && ioctl_index == 8'b0;
+	wire reset = (RESET | rom_download | !rom_downloaded);
+	always @(posedge clk_sys) if(rom_download) rom_downloaded <= 1'b1; // Latch downloaded rom state to release reset
+
 	blockade blockade (
 		.clk(clk_sys),
-		.reset(reset || ioctl_download),
+		.reset(reset),
 		.game_mode(game_mode),
 		.ce_pix(ce_pix),
 		.video(video),

@@ -4,7 +4,7 @@
 	<manufacturer>Gremlin</manufacturer>
 
 	<setname>blockade</setname>
-	<mameversion>0225</mameversion>
+	<mameversion>0229</mameversion>
 	<rbf>blockade</rbf>
 
 	<buttons default="Start" names="Start"></buttons>

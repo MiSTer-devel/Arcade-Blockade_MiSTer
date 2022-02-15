@@ -4,7 +4,7 @@
 	<manufacturer>Gremlin</manufacturer>
 
 	<setname>hustle</setname>
-	<mameversion>0225</mameversion>
+	<mameversion>0229</mameversion>
 	<rbf>blockade</rbf>
 
 	<buttons default="Select,Start" names="Coin,Start"></buttons>
@@ -18,13 +18,13 @@
 	<rom index="1"><part>02</part></rom>
 	<rom index="0" md5="none" zip="hustle.zip">
 		<!-- GAME ROMS -->
-		<part crc="none" name="3160016.u2"/>
-		<part crc="none" name="3160017.u3"/>
-		<part crc="none" name="3160018.u4"/>
-		<part crc="none" name="3160019.u5"/>
+		<part crc="none" name="316-0016.u2"/>
+		<part crc="none" name="316-0017.u3"/>
+		<part crc="none" name="316-0018.u4"/>
+		<part crc="none" name="316-0019.u5"/>
 		<!-- GFX PROMS -->
-		<part crc="none" name="3160020.u29"/>
-		<part crc="none" name="3160021.u43"/>
+		<part crc="none" name="316-0020.u29"/>
+		<part crc="none" name="316-0021.u43"/>
 	</rom>
 	<rom index="2"></rom>
 	<rom index="3"></rom>

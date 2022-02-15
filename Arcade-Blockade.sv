@@ -28,7 +28,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [47:0] HPS_BUS,
+	inout  [48:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -446,9 +446,13 @@ jtframe_resync jtframe_resync
 );
 
 ///////////////////   GAME   ////////////////////
-wire rom_download = ioctl_download && !ioctl_index;
-wire reset = (RESET | status[0] | buttons[1] | rom_download);
+reg rom_downloaded = 1'b0;
+wire rom_download = ioctl_download && ioctl_index == 8'b0;
+wire reset = (RESET | status[0] | buttons[1] | rom_download | ~rom_downloaded);
 assign LED_USER = rom_download;
+// Latch release reset if ROM data is received (stops sound circuit from going off if ROMs are not found)
+always @(posedge clk_sys) if(rom_download && ioctl_dout > 8'b0) rom_downloaded <= 1'b1; 
+
 
 blockade blockade (
 	.clk(clk_sys),

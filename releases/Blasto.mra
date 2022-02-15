@@ -4,7 +4,7 @@
 	<manufacturer>Gremlin</manufacturer>
 
 	<setname>blasto</setname>
-	<mameversion>0225</mameversion>
+	<mameversion>0229</mameversion>
 	<rbf>blockade</rbf>
 
 	<buttons default="Select,Start,A" names="Coin,Start,Fire"></buttons>
@@ -18,14 +18,14 @@
 	<rom index="1"><part>03</part></rom>
 	<rom index="0" md5="none" zip="blasto.zip">
 		<!-- GAME ROMS -->
-		<part crc="none" name="blasto.u2"/>
-		<part crc="none" name="blasto.u3"/>
-		<part crc="none" name="blasto.u4"/>
-		<part crc="none" name="blasto.u5"/>
+		<part crc="none" name="316-0089.u2"/>
+		<part crc="none" name="316-0090.u3"/>
+		<part crc="none" name="316-0091.u4"/>
+		<part crc="none" name="316-0092.u5"/>
 
 		<!-- GFX PROMS -->
-		<part crc="none" name="blasto.u29"/>
-		<part crc="none" name="blasto.u43"/>
+		<part crc="none" name="316-0093.u29"/>
+		<part crc="none" name="316-0094.u43"/>
 	</rom>
 	<rom index="2"></rom>
 	<rom index="3"></rom>

@@ -107,7 +107,7 @@ SimClock clk_sys(1);
 void resetSim()
 {
 	main_time = 0;
-	top->reset = 1;
+	top->RESET = 1;
 	clk_sys.Reset();
 }
 
@@ -281,9 +281,9 @@ int verilate()
 	{
 
 		// Assert reset during startup
-		if (main_time < initialReset) { top->reset = 1; }
+		if (main_time < initialReset) { top->RESET = 1; }
 		// Deassert reset after startup
-		if (main_time == initialReset) { top->reset = 0; }
+		if (main_time == initialReset) { top->RESET = 0; }
 
 		// Clock dividers
 		clk_sys.Tick();
@@ -476,14 +476,14 @@ int main(int argc, char** argv, char** env)
 	// Stage ROMs
 
 #ifdef IS_BLOCKADE
-	bus.QueueDownload("roms/blockade/316-0004.u2", 0);
-	bus.QueueDownload("roms/blockade/316-0003.u3", 0);
-	bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat ROMs for padding
-	bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat ROMs for padding
-	bus.QueueDownload("roms/blockade/316-0002.u29", 0);
-	bus.QueueDownload("roms/blockade/316-0002.u29", 0); // Repeat PROMs for padding (256 bytes only)
-	bus.QueueDownload("roms/blockade/316-0001.u43", 0);
-	bus.QueueDownload("roms/blockade/316-0001.u43", 0); // Repeat PROMs for padding (256 bytes only)
+	//bus.QueueDownload("roms/blockade/316-0004.u2", 0);
+	//bus.QueueDownload("roms/blockade/316-0003.u3", 0);
+	//bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat ROMs for padding
+	//bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat ROMs for padding
+	//bus.QueueDownload("roms/blockade/316-0002.u29", 0);
+	//bus.QueueDownload("roms/blockade/316-0002.u29", 0); // Repeat PROMs for padding (256 bytes only)
+	//bus.QueueDownload("roms/blockade/316-0001.u43", 0);
+	//bus.QueueDownload("roms/blockade/316-0001.u43", 0); // Repeat PROMs for padding (256 bytes only)
 	// Set overlay
 	top->emu__DOT__overlay_type = 0;
 #endif
