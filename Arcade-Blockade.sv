@@ -207,11 +207,15 @@ localparam CONF_STR = {
 	"OGJ,Analog Video H-Pos,0,-1,-2,-3,-4,-5,-6,-7,8,7,6,5,4,3,2,1;",
 	"OKN,Analog Video V-Pos,0,-1,-2,-3,-4,-5,-6,-7,8,7,6,5,4,3,2,1;",
 	"-;",
+	"P1,Pause options;",
+	"P1OP,Pause when OSD is open,On,Off;",
+	"P1OQ,Dim video after 10s,On,Off;",
+	"-;",
 	"DIP;",
 	"-;",
 	"R0,Reset;",
-	"J1,Coin,Start,Fire;",
-	"Jn,Select,Start,A;",
+	"J1,Fire,Start,Coin,Pause;",
+	"Jn,A,Start,R,L;",
 	"V,v",`BUILD_DATE
 };
 
@@ -239,9 +243,7 @@ wire        ioctl_upload;
 wire        ioctl_wr;
 wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
-wire  [7:0] ioctl_din;
 wire  [7:0] ioctl_index;
-wire        ioctl_wait;
 
 wire [15:0] joystick_0, joystick_1, joystick_2, joystick_3;
 
@@ -264,9 +266,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
-	.ioctl_din(ioctl_din),
 	.ioctl_index(ioctl_index),
-	.ioctl_wait(ioctl_wait),
 
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
@@ -292,12 +292,13 @@ wire p4_right = joystick_3[0];
 wire p4_left = joystick_3[1];
 wire p4_down = joystick_3[2];
 wire p4_up = joystick_3[3];
-wire btn_coin = joystick_0[4] || joystick_1[4] || joystick_2[4] || joystick_3[4];
+wire btn_fire1 = joystick_0[4];
+wire btn_fire2 = joystick_1[4];
 wire btn_start = joystick_0[5] || joystick_1[5] || joystick_2[5] || joystick_3[5];
 wire btn_start1 = joystick_0[5];
 wire btn_start2 = joystick_1[5];
-wire btn_fire1 = joystick_0[6];
-wire btn_fire2 = joystick_1[6];
+wire btn_coin = joystick_0[6] || joystick_1[6] || joystick_2[6] || joystick_3[6];
+wire btn_pause = joystick_0[7] || joystick_1[7] || joystick_2[7] || joystick_3[7];
 
 ///////////////////   DIPS   ////////////////////
 
@@ -387,7 +388,7 @@ begin
 	// Game specific inputs
 	case (game_mode)
 		GAME_BLOCKADE: begin 	
-			IN_1 <= ~{btn_coin, dip_blockade_lives, 1'b0, dip_boom, 2'b00}; // Coin + DIPS
+			IN_1 <= ~{btn_start, dip_blockade_lives, 1'b0, dip_boom, 2'b00}; // Coin + DIPS
 			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
 			IN_4 <= ~{8'b00000000}; // Unused
 		end
@@ -414,13 +415,13 @@ reg ce_pix;
 wire hblank, vblank, hs, vs, hs_original, vs_original;
 wire video;
 wire [2:0] video_rgb = {3{video}} & overlay_mask;
-wire [23:0] rgb = {{8{video_rgb[0]}},{8{video_rgb[1]}},{8{video_rgb[2]}}};
+wire [5:0] rgb_out;
 
 arcade_video #(256,24) arcade_video
 (
 	.*,
 	.clk_video(clk_sys),
-	.RGB_in(rgb),
+	.RGB_in({{4{rgb_out[5:4]}}, {4{rgb_out[3:2]}}, {4{rgb_out[1:0]}}}),
 	.HBlank(hblank),
 	.VBlank(vblank),
 	.HSync(hs),
@@ -445,6 +446,18 @@ jtframe_resync jtframe_resync
 	.vs_out(vs)
 );
 
+///////////////////   PAUSE   ///////////////////
+wire		pause_cpu;
+pause #(2,2,2,24) pause (
+	.*,
+	.r({2{video_rgb[0]}}),
+	.g({2{video_rgb[1]}}),
+	.b({2{video_rgb[2]}}),
+	.user_button(btn_pause),
+	.pause_request(),
+	.options(~status[26:25])
+);
+
 ///////////////////   GAME   ////////////////////
 reg rom_downloaded = 1'b0;
 wire rom_download = ioctl_download && ioctl_index == 8'b0;
@@ -453,10 +466,10 @@ assign LED_USER = rom_download;
 // Latch release reset if ROM data is received (stops sound circuit from going off if ROMs are not found)
 always @(posedge clk_sys) if(rom_download && ioctl_dout > 8'b0) rom_downloaded <= 1'b1; 
 
-
 blockade blockade (
 	.clk(clk_sys),
 	.reset(reset),
+	.pause(pause_cpu),
 	.game_mode(game_mode),
 	.video(video),
 	.ce_pix(ce_pix),

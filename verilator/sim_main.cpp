@@ -36,6 +36,7 @@ using namespace std;
 // ------------------
 int initialReset = 48;
 bool run_enable = 1;
+bool pause_game = 0;
 int batchSize = 25000000 / 100;
 bool single_step = 0;
 bool multi_step = 0;
@@ -476,14 +477,14 @@ int main(int argc, char** argv, char** env)
 	// Stage ROMs
 
 #ifdef IS_BLOCKADE
-	//bus.QueueDownload("roms/blockade/316-0004.u2", 0);
-	//bus.QueueDownload("roms/blockade/316-0003.u3", 0);
-	//bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat ROMs for padding
-	//bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat ROMs for padding
-	//bus.QueueDownload("roms/blockade/316-0002.u29", 0);
-	//bus.QueueDownload("roms/blockade/316-0002.u29", 0); // Repeat PROMs for padding (256 bytes only)
-	//bus.QueueDownload("roms/blockade/316-0001.u43", 0);
-	//bus.QueueDownload("roms/blockade/316-0001.u43", 0); // Repeat PROMs for padding (256 bytes only)
+	bus.QueueDownload("roms/blockade/316-0004.u2", 0);
+	bus.QueueDownload("roms/blockade/316-0003.u3", 0);
+	bus.QueueDownload("roms/blockade/316-0004.u2", 0); // Repeat ROMs for padding
+	bus.QueueDownload("roms/blockade/316-0003.u3", 0); // Repeat ROMs for padding
+	bus.QueueDownload("roms/blockade/316-0002.u29", 0);
+	bus.QueueDownload("roms/blockade/316-0002.u29", 0); // Repeat PROMs for padding (256 bytes only)
+	bus.QueueDownload("roms/blockade/316-0001.u43", 0);
+	bus.QueueDownload("roms/blockade/316-0001.u43", 0); // Repeat PROMs for padding (256 bytes only)
 	// Set overlay
 	top->emu__DOT__overlay_type = 0;
 #endif
@@ -565,7 +566,7 @@ int main(int argc, char** argv, char** env)
 		// Simulation control window
 		ImGui::Begin(windowTitle_Control);
 		ImGui::SetWindowPos(windowTitle_Control, ImVec2(0, 0), ImGuiCond_Once);
-		ImGui::SetWindowSize(windowTitle_Control, ImVec2(500, 150), ImGuiCond_Once);
+		ImGui::SetWindowSize(windowTitle_Control, ImVec2(500, 170), ImGuiCond_Once);
 		if (ImGui::Button("Reset simulation")) { resetSim(); } ImGui::SameLine();
 		if (ImGui::Button("Start running")) { run_enable = 1; } ImGui::SameLine();
 		if (ImGui::Button("Stop running")) { run_enable = 0; } ImGui::SameLine();
@@ -579,6 +580,9 @@ int main(int argc, char** argv, char** env)
 		if (ImGui::Button("Multi Step")) { run_enable = 0; multi_step = 1; }
 		//ImGui::SameLine();
 		ImGui::SliderInt("Multi step amount", &multi_step_amount, 8, 1024);
+
+		ImGui::Checkbox("Pause game", &pause_game); ImGui::SameLine();
+		top->emu__DOT__pause_cpu = pause_game;
 
 #ifdef CPU_DEBUG
 		ImGui::NewLine();

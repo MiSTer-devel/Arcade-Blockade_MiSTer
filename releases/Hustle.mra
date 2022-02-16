@@ -7,7 +7,7 @@
 	<mameversion>0229</mameversion>
 	<rbf>blockade</rbf>
 
-	<buttons default="Select,Start" names="Coin,Start"></buttons>
+	<buttons default="Start,R,L" names="-,Start,Coin,Pause"></buttons>
 	<switches default="20">
 		<dip bits="0,1" ids="4 coins / 1 credit,3 coins / 1 credit,2 coins / 1 credit,1 coins / 1 credit" name="Coinage" values="3,2,1,0"></dip>
 		<dip bits="2,3" ids="11000,13000,15000,17000" name="Free Game" values="3,2,1,0"></dip>

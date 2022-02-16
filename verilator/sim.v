@@ -32,6 +32,8 @@ module emu(
 
 	wire ce_pix /*verilator public_flat*/;
 
+	reg pause_cpu /*verilator public_flat*/;
+
 	reg [1:0] game_mode /*verilator public_flat*/;
 	localparam GAME_BLOCKADE = 0;
 	localparam GAME_COMOTION = 1;
@@ -164,6 +166,7 @@ module emu(
 	blockade blockade (
 		.clk(clk_sys),
 		.reset(reset),
+		.pause(pause_cpu),
 		.game_mode(game_mode),
 		.ce_pix(ce_pix),
 		.video(video),

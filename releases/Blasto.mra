@@ -7,7 +7,7 @@
 	<mameversion>0229</mameversion>
 	<rbf>blockade</rbf>
 
-	<buttons default="Select,Start,A" names="Coin,Start,Fire"></buttons>
+	<buttons default="A,Start,R,L" names="Fire,Start,Coin,Pause"></buttons>
 	<switches default="00">
 		<dip bits="0,1" ids="4 coins / 1 credit,3 coins / 1 credit,2 coins / 1 credit,1 coins / 1 credit" name="Coinage" values="3,2,1,0"></dip>
 		<dip bits="2" ids="Off,On" name="Demo Sounds" values="1,0"></dip>

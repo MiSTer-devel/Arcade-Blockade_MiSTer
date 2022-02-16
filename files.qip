@@ -7,4 +7,5 @@ set_global_assignment -name VERILOG_FILE rtl/astable_555.v
 set_global_assignment -name VERILOG_FILE rtl/audio/blockade_lpf.v
 set_global_assignment -name VERILOG_FILE rtl/audio/iir_1st_order.v
 set_global_assignment -name VERILOG_FILE rtl/JTFRAME/jtframe_resync.v
+set_global_assignment -name VERILOG_FILE rtl/pause.v
 set_global_assignment -name SYSTEMVERILOG_FILE Arcade-Blockade.sv

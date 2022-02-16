@@ -24,6 +24,7 @@
 module blockade (
 	input clk,
 	input reset,
+	input pause,
 	input [1:0] game_mode,
 
 	output ce_pix,
@@ -127,7 +128,7 @@ vm80a cpu
 	.pin_d(DATA),
 	.pin_hold(1'b0),
 	.pin_hlda(),
-	.pin_ready(u9_q),
+	.pin_ready(u9_q && !pause),
 	.pin_wait(),
 	.pin_int(1'b0),
 	.pin_inte(),
@@ -361,31 +362,34 @@ begin
 	end
 	else
 	begin
-		if(!wav_playing)
+		if(!pause)
 		begin
-			if(wav_play)
+			if(!wav_playing)
 			begin
-				wav_playing <= 1'b1;
-				wave_rom_addr <= 16'b0;
-				wav_counter <= WAV_COUNTER_MAX;
-			end
-		end
-		else
-		begin
-			wav_counter <= wav_counter - 1'b1;
-			if(wav_counter == {WAV_COUNTER_SIZE{1'b0}})
-			begin
-				if(wave_rom_addr < wave_rom_length)
+				if(wav_play)
 				begin
-					wav_signed <= wave_rom_data_out;
-					wave_rom_addr <= wave_rom_addr + 16'b1;
-					wav_counter <= {WAV_COUNTER_SIZE{1'b1}};
-				end
-				else
-				begin
-					wav_signed <= 8'b0;
+					wav_playing <= 1'b1;
 					wave_rom_addr <= 16'b0;
-					wav_playing <= 1'b0;
+					wav_counter <= WAV_COUNTER_MAX;
+				end
+			end
+			else
+			begin
+				wav_counter <= wav_counter - 1'b1;
+				if(wav_counter == {WAV_COUNTER_SIZE{1'b0}})
+				begin
+					if(wave_rom_addr < wave_rom_length)
+					begin
+						wav_signed <= wave_rom_data_out;
+						wave_rom_addr <= wave_rom_addr + 16'b1;
+						wav_counter <= {WAV_COUNTER_SIZE{1'b1}};
+					end
+					else
+					begin
+						wav_signed <= 8'b0;
+						wave_rom_addr <= 16'b0;
+						wav_playing <= 1'b0;
+					end
 				end
 			end
 		end
@@ -394,14 +398,13 @@ end
 
 wire signed [15:0] wav_amplified = { wav_signed[7], {1{wav_signed[7]}}, wav_signed[6:0], {7{wav_signed[7]}} };
 
-
 // Audio mixer
 // -----------
 // - Combine discrete audio circuit and wave output, then invert
-wire signed [15:0] sound_combined = sound_filtered + wav_amplified;
-assign audio_l = 16'hFFFF - sound_combined;
-assign audio_r = audio_l;
+wire signed [15:0] sound_combined = 16'hFFFF - (sound_filtered + wav_amplified);
 
+assign audio_l = pause ? 16'b0 : sound_combined;
+assign audio_r = audio_l;
 
 // Coin circuit
 // ------------
