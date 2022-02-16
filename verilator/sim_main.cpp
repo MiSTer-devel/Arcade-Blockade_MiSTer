@@ -37,7 +37,7 @@ using namespace std;
 int initialReset = 48;
 bool run_enable = 1;
 bool pause_game = 0;
-int batchSize = 25000000 / 100;
+int batchSize = 25000000 / 100000;
 bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
@@ -490,25 +490,25 @@ int main(int argc, char** argv, char** env)
 #endif
 
 #ifdef IS_COMOTION
-	bus.QueueDownload("roms/comotion/316-07.u2", 0);
-	bus.QueueDownload("roms/comotion/316-08.u3", 0);
-	bus.QueueDownload("roms/comotion/316-09.u4", 0);
-	bus.QueueDownload("roms/comotion/316-10.u5", 0);
-	bus.QueueDownload("roms/comotion/316-06.u43", 0);
-	bus.QueueDownload("roms/comotion/316-06.u43", 0); // Repeat PROMs for padding (256 bytes only)
-	bus.QueueDownload("roms/comotion/316-05.u29", 0);
-	bus.QueueDownload("roms/comotion/316-05.u29", 0); // Repeat PROMs for padding (256 bytes only)
+	bus.QueueDownload("roms/comotion/316-007.u2", 0);
+	bus.QueueDownload("roms/comotion/316-008.u3", 0);
+	bus.QueueDownload("roms/comotion/316-009.u4", 0);
+	bus.QueueDownload("roms/comotion/316-010.u5", 0);
+	bus.QueueDownload("roms/comotion/316-006.u43", 0);
+	bus.QueueDownload("roms/comotion/316-006.u43", 0); // Repeat PROMs for padding (256 bytes only)
+	bus.QueueDownload("roms/comotion/316-005.u29", 0);
+	bus.QueueDownload("roms/comotion/316-005.u29", 0); // Repeat PROMs for padding (256 bytes only)
 	// Set overlay
 	top->emu__DOT__overlay_type = 0;
 #endif
 
 #ifdef IS_HUSTLE
-	bus.QueueDownload("roms/hustle/3160016.u2", 0);
-	bus.QueueDownload("roms/hustle/3160017.u3", 0);
-	bus.QueueDownload("roms/hustle/3160018.u4", 0);
-	bus.QueueDownload("roms/hustle/3160019.u5", 0);
-	bus.QueueDownload("roms/hustle/3160020.u29", 0);
-	bus.QueueDownload("roms/hustle/3160021.u43", 0);
+	bus.QueueDownload("roms/hustle/316-0016.u2", 0);
+	bus.QueueDownload("roms/hustle/316-0017.u3", 0);
+	bus.QueueDownload("roms/hustle/316-0018.u4", 0);
+	bus.QueueDownload("roms/hustle/316-0019.u5", 0);
+	bus.QueueDownload("roms/hustle/316-0020.u29", 0);
+	bus.QueueDownload("roms/hustle/316-0021.u43", 0);
 	// Set overlay
 	top->emu__DOT__overlay_type = 0;
 #endif

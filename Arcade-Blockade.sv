@@ -388,24 +388,24 @@ begin
 	// Game specific inputs
 	case (game_mode)
 		GAME_BLOCKADE: begin 	
-			IN_1 <= ~{btn_start, dip_blockade_lives, 1'b0, dip_boom, 2'b00}; // Coin + DIPS
-			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
+			IN_1 <= ~{btn_coin, dip_blockade_lives, 1'b0, dip_boom, 2'b00};
+			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up};
 			IN_4 <= ~{8'b00000000}; // Unused
 		end
 		GAME_COMOTION: begin 
-			IN_1 <= ~{btn_coin, 2'b0, btn_start, dip_comotion_lives, dip_boom, 2'b00}; // Coin + DIPS
-			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
-			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p3_left, p3_down, p3_right, p3_up}; // P2 + P3 Controls
+			IN_1 <= ~{btn_coin, 2'b0, btn_start, dip_comotion_lives, dip_boom, 2'b00}; 
+			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up};
+			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p3_left, p3_down, p3_right, p3_up};
 		end
 		GAME_HUSTLE: begin 
-			IN_1 <= ~{btn_coin, 2'b0, btn_start2, btn_start1, dip_hustle_time, dip_hustle_coin}; // Coin + DIPS
-			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up}; // P1 + P2 Controls
+			IN_1 <= ~{btn_coin, 2'b0, btn_start2, btn_start1, dip_hustle_time, dip_hustle_coin};
+			IN_2 <= ~{p1_left, p1_down, p1_right, p1_up, p2_left, p2_down, p2_right, p2_up};
 			IN_4 <= dip_hustle_freegame; // Extra DIPS
 		end
 		GAME_BLASTO: begin 
-			IN_1 <= ~{btn_coin, 3'b0, dip_blasto_time, dip_blasto_demosounds, dip_blasto_coin}; // Coin, Starts, DIPS
+			IN_1 <= ~{btn_coin, 3'b0, dip_blasto_time, dip_blasto_demosounds, dip_blasto_coin};
 			IN_2 <= ~{btn_fire1, btn_start2, btn_start1, 4'b0000, btn_fire2}; 
-			IN_4 <= ~{p1_up, p1_left, p1_down, p1_right, p2_up, p2_left, p2_down, p2_right}; // P1 + P2 Controls
+			IN_4 <= ~{p1_up, p1_left, p1_down, p1_right, p2_up, p2_left, p2_down, p2_right};
 		end
 	endcase
 end
