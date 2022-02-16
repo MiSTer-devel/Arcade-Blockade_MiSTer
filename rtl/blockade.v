@@ -259,22 +259,24 @@ wire OUTP2 = OUTP && ADDR[1];
 always @(posedge clk)
 begin
 
-	if(OUTP2) u6261 <= DATA; // OUTP2 - Latch CPU data into counter preloaders
-
 	u68_out_last <= u68_out;
 	if(RESET)
 	begin
 		// Reset preloader and counter outputs 
-		u6766_count <= 8'b0;
+		u6766_count <= 8'hFF;
 		u6766_out <= 1'b0;
 		u6766_out_last <= 1'b0;
+		u6261 <= 8'hFF;
 	end
 	else
 	begin
+		
+		if(OUTP2) u6261 <= DATA; // OUTP2 - Latch CPU data into counter preloaders
+
 		u6766_out_last <= u6766_out;
 		if(u68_out && !u68_out_last)
 		begin
-			if(u6766_out) // Load new inputs when counter overflows
+			if((u6766_count == 8'd255)) // Load new inputs when counter overflows
 			begin
 				u6766_count <= u6261;
 				u6766_out <= 1'b0;
@@ -282,7 +284,7 @@ begin
 			else
 			begin // Increment counter and output high if counter is overflowing
 				u6766_count <= u6766_count + 8'b1;
-				u6766_out <= (u6766_count == 8'd255);
+				u6766_out <= (u6766_count == 8'd254);
 			end
 		end
 	end
@@ -305,7 +307,7 @@ begin
 end
 
 // Amplify square wave to produce output
-wire signed [15:0] sound_out = (!u60_2_q ? -20000 : 20000);
+wire signed [15:0] sound_out = u6766_count == 8'd255 ? 0 : (!u60_2_q ? -18000 : 18000);
 
 // Low-pass filter the square wave
 // - Cut-off frequency of 723.43Hz calculated from 220K resistor and 0.001µF capacitor pairing
@@ -331,8 +333,10 @@ wire u50_3 = ~(u50_1 && u50_4);
 wire u50_4 = ~(u50_2 && u50_3);
 /* verilator lint_on UNOPTFLAT */
 always @(posedge clk) begin
-	// Trigger ENV sound (play boom sample)
-	wav_play <= u50_4;
+	if(RESET)
+		wav_play <= 1'b0; // Don't play sample during reset
+	else
+		wav_play <= u50_4; // Trigger ENV sound (play boom sample)
 end
 
 // Wave player
@@ -359,6 +363,7 @@ begin
 	if(RESET)
 	begin
 		wav_signed <= 8'b0;
+		wav_playing <= 1'b0;		
 	end
 	else
 	begin
@@ -402,8 +407,9 @@ wire signed [15:0] wav_amplified = { wav_signed[7], {1{wav_signed[7]}}, wav_sign
 // -----------
 // - Combine discrete audio circuit and wave output, then invert
 wire signed [15:0] sound_combined = 16'hFFFF - (sound_filtered + wav_amplified);
-
-assign audio_l = pause ? 16'b0 : sound_combined;
+reg signed [15:0] sound_last;
+always @(posedge clk) if(!pause) sound_last <= sound_combined;
+assign audio_l = pause ? sound_last : sound_combined;
 assign audio_r = audio_l;
 
 // Coin circuit

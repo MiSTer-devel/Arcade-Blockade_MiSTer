@@ -26,7 +26,7 @@ module blockade_lpf
 	output signed [15:0] out
 );
 
-	reg [9:0] div = 256;
+	reg [9:0] div = 64;
 	reg signed [17:0] A2;
 	reg signed [17:0] B2;
 	reg signed [17:0] B1;
