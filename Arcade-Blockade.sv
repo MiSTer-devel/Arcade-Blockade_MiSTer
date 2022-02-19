@@ -196,8 +196,8 @@ assign BUTTONS = 0;
 
 wire [1:0] ar = status[9:8];
 
-assign VIDEO_ARX = (!ar) ? 12'd9 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd5 : 12'd0;
+assign VIDEO_ARX = (!ar) ? 12'd8 : (ar - 1'd1);
+assign VIDEO_ARY = (!ar) ? 12'd7 : 12'd0;
 
 `include "build_id.v" 
 localparam CONF_STR = {
