@@ -37,15 +37,15 @@ using namespace std;
 int initialReset = 48;
 bool run_enable = 1;
 bool pause_game = 0;
-int batchSize = 25000000 / 100000;
+int batchSize = 25000000 / 100;
 bool single_step = 0;
 bool multi_step = 0;
 int multi_step_amount = 1024;
 
-#define IS_BLOCKADE
+//#define IS_BLOCKADE
 //#define IS_COMOTION
 //#define IS_HUSTLE
-//#define IS_BLASTO
+#define IS_BLASTO
 
 
 // Debug GUI 
@@ -275,6 +275,10 @@ bool vbl_last;
 
 #endif
 
+void saveScreenshot() {
+
+}
+
 int verilate()
 {
 
@@ -490,14 +494,14 @@ int main(int argc, char** argv, char** env)
 #endif
 
 #ifdef IS_COMOTION
-	bus.QueueDownload("roms/comotion/316-007.u2", 0);
-	bus.QueueDownload("roms/comotion/316-008.u3", 0);
-	bus.QueueDownload("roms/comotion/316-009.u4", 0);
-	bus.QueueDownload("roms/comotion/316-010.u5", 0);
-	bus.QueueDownload("roms/comotion/316-006.u43", 0);
-	bus.QueueDownload("roms/comotion/316-006.u43", 0); // Repeat PROMs for padding (256 bytes only)
-	bus.QueueDownload("roms/comotion/316-005.u29", 0);
-	bus.QueueDownload("roms/comotion/316-005.u29", 0); // Repeat PROMs for padding (256 bytes only)
+	bus.QueueDownload("roms/comotion/316-0007.u2", 0);
+	bus.QueueDownload("roms/comotion/316-0008.u3", 0);
+	bus.QueueDownload("roms/comotion/316-0009.u4", 0);
+	bus.QueueDownload("roms/comotion/316-0010.u5", 0);
+	bus.QueueDownload("roms/comotion/316-0006.u43", 0);
+	bus.QueueDownload("roms/comotion/316-0006.u43", 0); // Repeat PROMs for padding (256 bytes only)
+	bus.QueueDownload("roms/comotion/316-0005.u29", 0);
+	bus.QueueDownload("roms/comotion/316-0005.u29", 0); // Repeat PROMs for padding (256 bytes only)
 	// Set overlay
 	top->emu__DOT__overlay_type = 0;
 #endif
@@ -514,12 +518,12 @@ int main(int argc, char** argv, char** env)
 #endif
 
 #ifdef IS_BLASTO
-	bus.QueueDownload("roms/blasto/blasto.u2", 0);
-	bus.QueueDownload("roms/blasto/blasto.u3", 0);
-	bus.QueueDownload("roms/blasto/blasto.u4", 0); 
-	bus.QueueDownload("roms/blasto/blasto.u5", 0); 
-	bus.QueueDownload("roms/blasto/blasto.u29", 0);
-	bus.QueueDownload("roms/blasto/blasto.u43", 0);
+	bus.QueueDownload("roms/blasto/316-0089.u2", 0);
+	bus.QueueDownload("roms/blasto/316-0090.u3", 0);
+	bus.QueueDownload("roms/blasto/316-0091.u4", 0); 
+	bus.QueueDownload("roms/blasto/316-0092.u5", 0); 
+	bus.QueueDownload("roms/blasto/316-0093.u29", 0);
+	bus.QueueDownload("roms/blasto/316-0094.u43", 0);
 	// Set overlay
 	top->emu__DOT__overlay_type = 1;
 #endif
@@ -583,6 +587,8 @@ int main(int argc, char** argv, char** env)
 
 		ImGui::Checkbox("Pause game", &pause_game); ImGui::SameLine();
 		top->emu__DOT__pause_cpu = pause_game;
+
+		if (ImGui::Button("Save screenshot")) { saveScreenshot(); }
 
 #ifdef CPU_DEBUG
 		ImGui::NewLine();

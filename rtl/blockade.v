@@ -307,7 +307,7 @@ begin
 end
 
 // Amplify square wave to produce output
-wire signed [15:0] sound_out = u6766_count == 8'd255 ? 0 : (!u60_2_q ? -18000 : 18000);
+wire signed [15:0] sound_out = u6766_count == 8'd255 ? 0 : (!u60_2_q ? -12000 : 12000);
 
 // Low-pass filter the square wave
 // - Cut-off frequency of 723.43Hz calculated from 220K resistor and 0.001µF capacitor pairing
