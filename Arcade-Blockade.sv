@@ -52,13 +52,14 @@ module emu
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
+	output        VGA_DISABLE, // analog out is off
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
 	output        HDMI_FREEZE,
 
 `ifdef MISTER_FB
-	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
+	// Use framebuffer in DDRAM
 	// FB_FORMAT:
 	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
 	//    [3]   : 0=16bits 565 1=16bits 1555
@@ -183,7 +184,8 @@ assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQM
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;  
 
 assign VGA_F1 = 0;
-assign VGA_SCALER = 0;
+assign VGA_SCALER  = 0;
+assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
 
 assign AUDIO_S = 1;
@@ -394,9 +396,9 @@ begin
 			IN_4 <= ~{8'b00000000}; // Unused
 		end
 		GAME_COMOTION: begin 
-			IN_1 <= ~{btn_coin, 2'b0, btn_start, dip_comotion_lives, dip_boom, 2'b00}; 
-			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up};
-			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p3_left, p3_down, p3_right, p3_up};
+			IN_1 <= ~{btn_coin, 2'b0, btn_start, dip_comotion_lives, dip_boom, 2'b00}; // Coin, Starts, DIPS
+			IN_2 <= ~{p3_left, p3_down, p3_right, p3_up, p1_left, p1_down, p1_right, p1_up}; // P3 + P1 Controls
+			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p2_left, p2_down, p2_right, p2_up}; // P4 + P2 Controls
 		end
 		GAME_HUSTLE: begin 
 			IN_1 <= ~{btn_coin, 2'b0, btn_start2, btn_start1, dip_hustle_time, dip_hustle_coin};
