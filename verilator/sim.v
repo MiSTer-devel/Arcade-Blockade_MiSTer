@@ -111,8 +111,8 @@ module emu(
 		end
 		GAME_COMOTION: begin 
 			IN_1 <= ~{btn_coin, 2'b0, btn_start1||btn_start2, comotion_dip_lives_3, btn_boom, 2'b00}; // Coin, Starts, DIPS
-			IN_2 <= ~{p2_left, p2_down, p2_right, p2_up, p1_left, p1_down, p1_right, p1_up}; // P1 + P2 Controls
-			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p3_left, p3_down, p3_right, p3_up}; // P2 + P3 Controls
+			IN_2 <= ~{p3_left, p3_down, p3_right, p3_up, p1_left, p1_down, p1_right, p1_up}; // P3 + P1 Controls
+			IN_4 <= ~{p4_left, p4_down, p4_right, p4_up, p2_left, p2_down, p2_right, p2_up}; // P4 + P2 Controls
 		end
 		GAME_HUSTLE: begin 
 			IN_1 <= ~{btn_coin, 2'b0, btn_start2, btn_start1, hustle_dip_time_120, hustle_dip_coin_1C1C}; // Coin, Starts, DIPS
