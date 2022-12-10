@@ -2,7 +2,7 @@
 	<name>Blasto</name>
 	<year>1978</year>
 	<manufacturer>Gremlin</manufacturer>
-
+	<rotation>horizontal</rotation>
 	<setname>blasto</setname>
 	<mameversion>0229</mameversion>
 	<rbf>blockade</rbf>
