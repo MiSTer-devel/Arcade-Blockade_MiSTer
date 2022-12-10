@@ -2,7 +2,7 @@
 	<name>Blockade</name>
 	<year>1976</year>
 	<manufacturer>Gremlin</manufacturer>
-
+	<rotation>horizontal</rotation>
 	<setname>blockade</setname>
 	<mameversion>0229</mameversion>
 	<rbf>blockade</rbf>

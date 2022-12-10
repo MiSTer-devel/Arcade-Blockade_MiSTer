@@ -2,7 +2,7 @@
 	<name>Hustle</name>
 	<year>1977</year>
 	<manufacturer>Gremlin</manufacturer>
-
+	<rotation>horizontal</rotation>
 	<setname>hustle</setname>
 	<mameversion>0229</mameversion>
 	<rbf>blockade</rbf>
